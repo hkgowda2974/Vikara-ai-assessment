@@ -1,17 +1,14 @@
-import os
-import json
 import datetime
 from dateutil import parser
 from dateutil import tz
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 
+SERVICE_ACCOUNT_FILE = "service_account.json"
 SCOPES = ["https://www.googleapis.com/auth/calendar"]
 
-# Load credentials from environment variable
-service_account_info = json.loads(os.environ["GOOGLE_SERVICE_ACCOUNT"])
-credentials = service_account.Credentials.from_service_account_info(
-    service_account_info, scopes=SCOPES
+credentials = service_account.Credentials.from_service_account_file(
+    SERVICE_ACCOUNT_FILE, scopes=SCOPES
 )
 
 service = build("calendar", "v3", credentials=credentials)
