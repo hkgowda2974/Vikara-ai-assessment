@@ -1,6 +1,2 @@
-service_account.json
-.venv/
-__pycache__/
-*.pyc
-node_modules/
-vapi-bundle.js
+
+
