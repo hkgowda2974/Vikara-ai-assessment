@@ -773,16 +773,101 @@ function handleTextInput(text){
    SIMPLE DATE EXTRACTOR (for user speech)
 ════════════════════ */
 function parseDateFromText(text){
-  const months = {jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11,
-    january:0,february:1,march:2,april:3,june:5,july:6,august:7,september:8,october:9,november:10,december:11};
+  const months = {
+    jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11,
+    january:0,february:1,march:2,april:3,june:5,july:6,august:7,september:8,
+    october:9,november:10,december:11
+  };
+  // Convert any spoken number or ordinal to an integer
+  function spokenToNum(str) {
+    if(!str) return NaN;
+    str = str.toLowerCase().trim().replace(/[- ]+/g, ' ');
+    const ones = {
+      zero:0,one:1,two:2,three:3,four:4,five:5,six:6,seven:7,eight:8,nine:9,
+      ten:10,eleven:11,twelve:12,thirteen:13,fourteen:14,fifteen:15,sixteen:16,
+      seventeen:17,eighteen:18,nineteen:19,
+      // ordinals
+      first:1,second:2,third:3,fourth:4,fifth:5,sixth:6,seventh:7,eighth:8,
+      ninth:9,tenth:10,eleventh:11,twelfth:12,thirteenth:13,fourteenth:14,
+      fifteenth:15,sixteenth:16,seventeenth:17,eighteenth:18,nineteenth:19
+    };
+    const tens = {twenty:20,thirty:30,twentieth:20,thirtieth:30};
+
+    // Plain digit
+    if(/^\d+$/.test(str)) return parseInt(str);
+
+    // Single word: "five", "eighth"
+    if(ones[str] !== undefined) return ones[str];
+    if(tens[str] !== undefined) return tens[str];
+
+    // Two words: "twenty one", "thirty second", "twenty eighth"
+    const parts = str.split(' ');
+    if(parts.length === 2){
+      const t = tens[parts[0]];
+      const o = ones[parts[1]];
+      if(t !== undefined && o !== undefined) return t + o;
+      // e.g. "twenty first" → 21
+      const ordinalOnes = {first:1,second:2,third:3,fourth:4,fifth:5,sixth:6,
+        seventh:7,eighth:8,ninth:9};
+      if(t !== undefined && ordinalOnes[parts[1]] !== undefined) return t + ordinalOnes[parts[1]];
+    }
+    return NaN;
+  }
+
   const today = new Date();
   const lower = text.toLowerCase();
   let d = null;
-  const dm = text.match(/\b(january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sep|oct|nov|dec)\s+(\d{1,2})(?:st|nd|rd|th)?\b/i);
-  if(dm){ const mIdx=months[dm[1].toLowerCase()],day=parseInt(dm[2]); if(mIdx!==undefined){ d=new Date(today.getFullYear(),mIdx,day); if(d<today)d.setFullYear(today.getFullYear()+1); } }
-  if(!d&&lower.includes('tomorrow')){ d=new Date(today); d.setDate(today.getDate()+1); }
-  if(!d&&lower.includes('next week')){ d=new Date(today); d.setDate(today.getDate()+7); }
-  if(!d&&lower.includes('today')){ d=new Date(today); }
+
+  // Pattern 1: "February twenty eighth" / "twenty eighth February" (spoken ordinals)
+  const monthNames = 'january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sep|oct|nov|dec';
+  // Pattern 1: spoken ordinals/cardinals + month name in any order
+  // Matches: "twenty eighth february", "february twenty eight", "28th february", "march 5"
+  const tensW   = 'twenty|thirty';
+  const onesW   = 'one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen';
+  const ordW    = 'first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth|eleventh|twelfth|thirteenth|fourteenth|fifteenth|sixteenth|seventeenth|eighteenth|nineteenth|twentieth|thirtieth';
+  const compOrd = '(?:twenty|thirty)[- ](?:' + onesW + '|first|second|third|fourth|fifth|sixth|seventh|eighth|ninth)';
+  const dayPat  = '(?:' + compOrd + '|' + tensW + '|' + onesW + '|' + ordW + '|\\d{1,2}(?:st|nd|rd|th)?)';
+
+  const r1 = new RegExp('(' + monthNames + ')\\s+(' + dayPat + ')', 'i');
+  const r2 = new RegExp('(' + dayPat + ')\\s+(?:of\\s+)?(' + monthNames + ')', 'i');
+
+  let mStr, dayStr;
+  const m1 = lower.match(r1);
+  const m2 = lower.match(r2);
+
+  if(m1){ mStr = m1[1]; dayStr = m1[2]; }
+  else if(m2){ dayStr = m2[1]; mStr = m2[2]; }
+
+  if(mStr && dayStr){
+    const mIdx = months[mStr.toLowerCase().replace(/[.]/g,'')];
+    let day = parseInt(dayStr.replace(/[a-z]+/gi,''));
+    if(isNaN(day)) day = spokenToNum(dayStr.replace(/(st|nd|rd|th)/gi,'').trim());
+    if(mIdx !== undefined && !isNaN(day) && day >= 1 && day <= 31){
+      d = new Date(today.getFullYear(), mIdx, day);
+      if(d < today) d.setFullYear(today.getFullYear() + 1);
+    }
+  }
+
+  // Pattern 2: "28th February" / "February 28"
+  if(!d){
+    const dm = text.match(/\b(january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sep|oct|nov|dec)\s+(\d{1,2})(?:st|nd|rd|th)?\b/i)
+            || text.match(/\b(\d{1,2})(?:st|nd|rd|th)?\s+(january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sep|oct|nov|dec)\b/i);
+    if(dm){
+      let ms, ds;
+      if(isNaN(dm[1])){ ms=dm[1]; ds=dm[2]; } else { ds=dm[1]; ms=dm[2]; }
+      const mIdx = months[ms.toLowerCase()];
+      const day  = parseInt(ds);
+      if(mIdx !== undefined && day >= 1 && day <= 31){
+        d = new Date(today.getFullYear(), mIdx, day);
+        if(d < today) d.setFullYear(today.getFullYear() + 1);
+      }
+    }
+  }
+
+  if(!d && lower.includes('tomorrow')){ d=new Date(today); d.setDate(today.getDate()+1); }
+  if(!d && lower.includes('next week')){ d=new Date(today); d.setDate(today.getDate()+7); }
+  if(!d && lower.includes('today'))   { d=new Date(today); }
+
   return d;
 }
 
@@ -857,7 +942,8 @@ function wireVapi(){
           lastMeetingDate  = pendingEvent.date;
           lastMeetingTime  = pendingEvent.time;
           allMeetingTitle  = pendingEvent.title;
-          console.log('[VAPI TOOL] pendingEvent stored:', pendingEvent);
+          console.log('[VAPI TOOL] ⭐ pendingEvent stored:', JSON.stringify(pendingEvent));
+          console.log('[VAPI TOOL] ⭐ args were:', JSON.stringify(args));
         }
       });
       return;
@@ -906,38 +992,51 @@ function wireVapi(){
           // gcalLink from tool-call result only
           const gcalLink = pendingEvent?.gcalLink || null;
 
-          // ── Parse date from the FULL accumulated buffer ──
-          // Agent reads "two zero two six zero two two eight" across multiple chunks
-          // which concatenates to "20260228" in the buffer
-          let eventDate = null;
+          // ── SOURCE OF TRUTH: what the USER said ──
+          // Tool-call event doesn't reach frontend, agent speech is garbled.
+          // User speech is always clean: "Twenty eighth February", "Ten AM", "Project sync"
+          console.log('[VAPI] allUserSpeech:', allUserSpeech);
 
-          const compact = assistantBuffer.match(/(202\d)(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])/);
-          const dashed  = assistantBuffer.match(/(202\d)-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])/);
-          const spaced  = assistantBuffer.match(/(202\d)\s+(0[1-9]|1[0-2])\s+(0[1-9]|[12]\d|3[01])/);
-          const dm = compact || dashed || spaced;
-
-          if(dm){
-            eventDate = new Date(dm[1] + '-' + dm[2] + '-' + dm[3] + 'T00:00:00');
-            if(isNaN(eventDate)) eventDate = null;
-            console.log('[VAPI] Date from buffer:', dm[0], '→', eventDate);
-          }
-
-          // Fallback to tool-call date (most accurate source)
-          if(!eventDate && pendingEvent?.date) eventDate = pendingEvent.date;
-          // Fallback to user speech
-          if(!eventDate) eventDate = parseDateFromText(allUserSpeech);
+          // DATE — parse from everything the user said during the call
+          let eventDate = parseDateFromText(allUserSpeech);
           if(!eventDate) eventDate = new Date(Date.now() + 86400000);
+          console.log('[VAPI] Date from user speech:', eventDate);
 
-          // ── Time from buffer ──
-          const timeMatch = assistantBuffer.match(/time[,\s]+(\d{1,2})(?::(\d{2}))?\s*(AM|PM)/i)
-                         || assistantBuffer.match(/(\d{1,2})(?::(\d{2}))?\s*(AM|PM)/i);
-          const time = timeMatch ? (timeMatch[1] + (timeMatch[2] ? ':'+timeMatch[2] : ':00') + ' ' + timeMatch[3].toUpperCase())
-                                 : (pendingEvent?.time || null);
+          // TIME — find the last time the user mentioned (e.g. "Ten AM", "3:30 PM")
+          const timeWords = {
+            'one':1,'two':2,'three':3,'four':4,'five':5,'six':6,
+            'seven':7,'eight':8,'nine':9,'ten':10,'eleven':11,'twelve':12
+          };
+          let time = null;
+          // Match digit time: "10 AM", "3:30 PM"
+          const digitTime = allUserSpeech.match(/(\d{1,2})(?::(\d{2}))?\s*(AM|PM)/i);
+          // Match word time: "Ten AM", "Nine PM"
+          const wordTime  = allUserSpeech.match(/(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)(?:\s+thirty)?\s*(AM|PM)/i);
+          if(digitTime){
+            time = digitTime[1] + (digitTime[2] ? ':'+digitTime[2] : ':00') + ' ' + digitTime[3].toUpperCase();
+          } else if(wordTime){
+            const h = timeWords[wordTime[1].toLowerCase()];
+            const half = /thirty/i.test(wordTime[0]) ? ':30' : ':00';
+            time = h + half + ' ' + wordTime[2].toUpperCase();
+          }
+          console.log('[VAPI] Time from user speech:', time);
 
-          // ── Title from tool-call args (NOT from lastUserUtterance which can be a stray word) ──
-          const title = (pendingEvent?.title && pendingEvent.title !== 'Meeting')
-            ? pendingEvent.title
-            : (allMeetingTitle || 'Meeting');
+          // TITLE — last substantive thing user said that isn't a date/time/name/filler
+          // Walk through all user utterances and find one that looks like a title
+          const stopWords = /^(yes|no|okay|ok|sure|thanks|thank|am|pm|ist|hello|hi|namaste|please|proceed|blank|leave|skip|none|no title)$/i;
+          const dateTimePattern = /(january|february|march|april|may|june|july|august|september|october|november|december|monday|tuesday|wednesday|thursday|friday|saturday|sunday|tomorrow|today|next|am|pm|ist|\d{1,2})/i;
+          const userParts = allUserSpeech.trim().split(/\s*\.\s*|\s{2,}/).map(s => s.trim()).filter(Boolean);
+          let title = 'Meeting';
+          // Go through utterances in reverse — last meaningful one is likely the title
+          for(let i = userParts.length - 1; i >= 0; i--){
+            const part = userParts[i].trim();
+            if(part.length < 2) continue;
+            if(stopWords.test(part)) continue;
+            if(dateTimePattern.test(part) && part.split(' ').length <= 4) continue;
+            title = part.charAt(0).toUpperCase() + part.slice(1);
+            break;
+          }
+          console.log('[VAPI] Title from user speech:', title);
 
           const ev = { title, date: eventDate, time, gcalLink };
           console.log('[VAPI] → goCalendar:', ev);
