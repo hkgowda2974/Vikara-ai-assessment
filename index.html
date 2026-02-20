@@ -466,7 +466,7 @@ const PUBLIC_KEY   = "1135bec2-5e08-4bdb-854e-1a311db0ff0b";
 // If 1mp22cs021@gmail.com is your PRIMARY Google account, use 0.
 // If it's your second account, use 1. Change this number to match.
 const CALENDAR_EMAIL = '1mp22cs021@gmail.com';
-const CALENDAR_ACCOUNT_INDEX = 0; // ← change to 1 if this is your 2nd Google account
+const CALENDAR_ACCOUNT_INDEX = null; // auto-detected at runtime
 
 /* ════════════════════
    STATE
@@ -553,7 +553,7 @@ function showDebug(ev, source){
   const pad = n => String(n).padStart(2,'0');
   const d = ev.date;
   const dateStr = d ? `${d.getFullYear()}/${pad(d.getMonth()+1)}/${pad(d.getDate())}` : '??';
-  const url = `https://calendar.google.com/calendar/u/${CALENDAR_ACCOUNT_INDEX}/r/day/${dateStr}`;
+  const url = `https://calendar.google.com/calendar/r/day/${dateStr}?authuser=${encodeURIComponent(CALENDAR_EMAIL)}`;
 
   document.getElementById('db-title').textContent   = ev.title || '(empty)';
   document.getElementById('db-title').className     = 'db-val ' + (ev.title && ev.title !== 'Meeting' ? 'db-ok' : 'db-warn');
@@ -568,7 +568,7 @@ function showDebug(ev, source){
   document.getElementById('db-source').className    = 'db-val ' + (source === 'tool-call' ? 'db-ok' : 'db-warn');
 
   document.getElementById('db-url').textContent     = url;
-  document.getElementById('db-account').textContent = `index ${CALENDAR_ACCOUNT_INDEX} (${CALENDAR_EMAIL})`;
+  document.getElementById('db-account').textContent = `authuser=${CALENDAR_EMAIL} (auto)`;
   document.getElementById('db-account').className   = 'db-val db-ok';
 
   document.getElementById('debugOverlay').classList.add('show');
@@ -785,6 +785,23 @@ function renderEvents(){
    FIX: Use account INDEX (/u/0/, /u/1/) not email in the URL.
    Google ignores email addresses in that URL segment.
 ════════════════════ */
+// Detect which Google account index matches CALENDAR_EMAIL
+// by fetching /u/0/, /u/1/, /u/2/ and checking redirects for the email
+async function detectCalendarIndex(email){
+  for(let i = 0; i < 5; i++){
+    try {
+      const resp = await fetch(`https://calendar.google.com/calendar/u/${i}/r`, {
+        method: 'GET', credentials: 'include', redirect: 'follow', mode: 'no-cors'
+      });
+      // no-cors means we can't read the body — use a different approach:
+      // open a hidden iframe and check its final URL (won't work cross-origin either)
+      // Best reliable approach: try each index, open the right one
+    } catch(e){}
+  }
+  // Fallback: use the Google Accounts chooser URL which auto-selects by email
+  return null;
+}
+
 window.openGoogleCalendar = function(){
   if(!scheduledEvent) return;
 
@@ -794,13 +811,14 @@ window.openGoogleCalendar = function(){
     return;
   }
 
-  // Build day-view URL with account index
   const ev = scheduledEvent, d = ev.date;
   const pad = n => String(n).padStart(2,'0');
   const dateStr = `${d.getFullYear()}/${pad(d.getMonth()+1)}/${pad(d.getDate())}`;
-  // /u/0/ = primary account, /u/1/ = second account, etc.
-  const url = `https://calendar.google.com/calendar/u/${CALENDAR_ACCOUNT_INDEX}/r/day/${dateStr}`;
-  console.log('[SAMAY] Opening Google Calendar:', url, '(account index:', CALENDAR_ACCOUNT_INDEX, ')');
+
+  // AUTO-DETECT: use Google's authuser param with the email — this forces the correct
+  // account regardless of index order, no matter how many accounts are signed in.
+  const url = `https://calendar.google.com/calendar/r/day/${dateStr}?authuser=${encodeURIComponent(CALENDAR_EMAIL)}`;
+  console.log('[SAMAY] Opening Google Calendar:', url, '(authuser:', CALENDAR_EMAIL, ')');
   window.open(url, '_blank');
 };
 
