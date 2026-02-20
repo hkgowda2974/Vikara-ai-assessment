@@ -36,7 +36,6 @@
       position: relative;
     }
 
-    /* Animated grid background */
     body::before {
       content: '';
       position: fixed;
@@ -54,7 +53,6 @@
       100% { transform: translate(48px, 48px); }
     }
 
-    /* Orb */
     .orb {
       position: fixed;
       width: 600px;
@@ -82,7 +80,6 @@
       50% { transform: translate(-50%, -50%) scale(1.08); }
     }
 
-    /* Main card */
     .card {
       position: relative;
       z-index: 10;
@@ -100,7 +97,6 @@
       to { opacity: 1; transform: translateY(0); }
     }
 
-    /* Header */
     .header {
       display: flex;
       align-items: center;
@@ -137,7 +133,6 @@
       margin-top: 1px;
     }
 
-    /* Status pill */
     .status-bar {
       display: flex;
       align-items: center;
@@ -185,7 +180,6 @@
       50% { opacity: 0.3; }
     }
 
-    /* Visualizer */
     .visualizer {
       display: flex;
       align-items: center;
@@ -229,7 +223,6 @@
       50% { height: var(--h, 20px); }
     }
 
-    /* Transcript */
     .transcript-box {
       background: rgba(255,255,255,0.02);
       border: 1px solid var(--border);
@@ -259,7 +252,6 @@
       font-size: 11px;
     }
 
-    /* Buttons */
     .btn-row {
       display: grid;
       grid-template-columns: 1fr 1fr;
@@ -315,7 +307,6 @@
     .btn-mute:hover:not(:disabled) { background: rgba(255,255,255,0.08); }
     .btn-mute.muted { color: var(--accent); border-color: rgba(0,229,160,0.25); }
 
-    /* Footer info */
     .footer-meta {
       display: flex;
       justify-content: space-between;
@@ -325,7 +316,6 @@
       opacity: 0.6;
     }
 
-    /* Backend ping indicator */
     .backend-status {
       display: flex;
       align-items: center;
@@ -339,10 +329,9 @@
       background: var(--muted);
     }
 
-    .backend-dot.ok { background: var(--accent); }
+    .backend-dot.ok   { background: var(--accent); }
     .backend-dot.fail { background: var(--red); }
 
-    /* Toast */
     .toast {
       position: fixed;
       bottom: 24px;
@@ -421,11 +410,11 @@
       </button>
       <button class="btn btn-mute" id="muteBtn" disabled>
         <svg id="muteIcon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <line x1="1" y1="1" x2="23" y2="23"/>
-          <path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6"/>
-          <path d="M17 16.95A7 7 0 0 1 5 12v-2m14 0v2a7 7 0 0 1-.11 1.23"/>
+          <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/>
+          <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+          <line x1="12" y1="19" x2="12" y2="23"/>
         </svg>
-        Muted
+        Mute
       </button>
     </div>
 
@@ -440,22 +429,13 @@
 
   <div class="toast" id="toast"></div>
 
-  <!-- Vapi loaded from local node_modules — no CDN needed -->
-    <script type="module">
-    // ─── LOAD VAPI FROM LOCAL NODE_MODULES VIA INLINE REQUIRE SHIM ───────────
-    // All files in @vapi-ai/web/dist are CommonJS (use "exports").
-    // We provide a minimal "require" shim so they work in the browser,
-    // then fetch+eval the bundle that esbuild produces.
-    //
-    // ONE-TIME SETUP — run this in your terminal first:
-    //   npx esbuild node_modules/@vapi-ai/web/dist/vapi.js --bundle --format=iife --global-name=VapiSDK --outfile=vapi-bundle.js --platform=browser --log-level=info
-    //
-    // You should see:  vapi-bundle.js  appear in your project root.
-
+  <script type="module">
     // ─── CONFIG ───────────────────────────────────────────────────────────────
-    const FASTAPI_BASE_URL = "https://vikara-ai-assessment.onrender.com";
-    const assistantId      = "f08de70a-4804-440d-89b1-5c6463f00a65";
-    const publicKey        = "1135bec2-5e08-4bdb-854e-1a311db0ff0b";
+    // Update FASTAPI_BASE_URL to your ngrok URL when sharing externally,
+    // or keep localhost for local testing.
+    const FASTAPI_BASE_URL = "http://localhost:8000";
+    const ASSISTANT_ID     = "f08de70a-4804-440d-89b1-5c6463f00a65";
+    const PUBLIC_KEY       = "1135bec2-5e08-4bdb-854e-1a311db0ff0b";
 
     // ─── STATE ────────────────────────────────────────────────────────────────
     let vapi            = null;
@@ -480,43 +460,59 @@
     const toast        = document.getElementById("toast");
 
     // ─── HELPERS ──────────────────────────────────────────────────────────────
-    function showToast(msg, duration = 3000) {
+    function showToast(msg, duration = 3500) {
       toast.textContent = msg;
       toast.classList.add("show");
       setTimeout(() => toast.classList.remove("show"), duration);
     }
-    function setStatus(label, type) {
+
+    function setStatus(label, type = "") {
       statusText.textContent = label;
       statusBar.className = "status-bar" + (type ? " " + type : "");
     }
+
     function setActive(active) {
       visualizer.classList.toggle("active", active);
       orb.classList.toggle("active", active);
     }
+
     function appendTranscript(role, text) {
-      if (transcriptEmpty) { transcriptEl.innerHTML = ""; transcriptEmpty = false; }
+      if (transcriptEmpty) {
+        transcriptEl.innerHTML = "";
+        transcriptEmpty = false;
+      }
       const line = document.createElement("div");
       line.className = "transcript-line " + role;
       line.innerHTML = `<span class="role">${role === "user" ? "YOU" : "AI"}:</span>${text}`;
       transcriptEl.appendChild(line);
       transcriptEl.scrollTop = transcriptEl.scrollHeight;
     }
+
     function startTimer() {
       callStart = Date.now();
       timerInterval = setInterval(() => {
         const s = Math.floor((Date.now() - callStart) / 1000);
         callTimer.textContent =
-          String(Math.floor(s / 60)).padStart(2,"0") + ":" + String(s % 60).padStart(2,"0");
+          String(Math.floor(s / 60)).padStart(2, "0") + ":" + String(s % 60).padStart(2, "0");
       }, 1000);
     }
-    function stopTimer() { clearInterval(timerInterval); callTimer.textContent = "—"; }
+
+    function stopTimer() {
+      clearInterval(timerInterval);
+      callTimer.textContent = "—";
+    }
 
     // ─── BACKEND PING ─────────────────────────────────────────────────────────
     async function pingBackend() {
       try {
         const r = await fetch(FASTAPI_BASE_URL + "/health");
-        backendDot.className     = r.ok ? "backend-dot ok"  : "backend-dot fail";
-        backendLabel.textContent = r.ok ? "backend online"  : "backend offline";
+        if (r.ok) {
+          backendDot.className     = "backend-dot ok";
+          backendLabel.textContent = "backend online";
+        } else {
+          backendDot.className     = "backend-dot fail";
+          backendLabel.textContent = "backend error";
+        }
       } catch {
         backendDot.className     = "backend-dot fail";
         backendLabel.textContent = "backend offline";
@@ -524,18 +520,6 @@
     }
     pingBackend();
     setInterval(pingBackend, 15000);
-
-    // ─── FASTAPI FORWARDER ────────────────────────────────────────────────────
-    async function handleFunctionCall(fnCall) {
-      try {
-        const r = await fetch(FASTAPI_BASE_URL + "/vapi/webhook", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ type: "function-call", functionCall: fnCall })
-        });
-        console.log("[FastAPI]", await r.json());
-      } catch { showToast("⚠ Backend unreachable"); }
-    }
 
     // ─── VAPI EVENT WIRING ────────────────────────────────────────────────────
     function wireEvents() {
@@ -548,29 +532,43 @@
         startTimer();
         showToast("✓ Call started");
       });
+
       vapi.on("call-end", () => {
         setStatus("Ready to connect");
         setActive(false);
         startBtn.disabled = false;
         stopBtn.disabled  = true;
         muteBtn.disabled  = true;
-        isMuted = false;
-        vapi    = null;
+        isMuted           = false;
+        muteBtn.textContent = "Mute";
+        muteBtn.classList.remove("muted");
+        vapi = null;
         stopTimer();
         showToast("Call ended");
       });
+
       vapi.on("speech-start", () => setStatus("AI is speaking...", "active"));
       vapi.on("speech-end",   () => setStatus("Listening...", "active"));
+
       vapi.on("message", (msg) => {
-        if (msg.type === "transcript" && msg.transcriptType === "final")
+        console.log("[Vapi message]", msg);
+
+        // Show transcript
+        if (msg.type === "transcript" && msg.transcriptType === "final") {
           appendTranscript(msg.role, msg.transcript);
-        if (msg.type === "function-call")
-          handleFunctionCall(msg.functionCall);
+        }
+
+        // Tool call result — show in transcript so user knows meeting was booked
+        if (msg.type === "tool-calls") {
+          console.log("[Vapi] tool-calls received:", msg);
+        }
       });
+
       vapi.on("error", (err) => {
         console.error("[Vapi error]", err);
-        setStatus("Error — see console", "error");
-        showToast("⚠ " + (err?.message || "Vapi error"));
+        setStatus("Error — check console", "error");
+        orb.classList.add("error");
+        showToast("⚠ " + (err?.message || "Vapi error"), 5000);
         startBtn.disabled = false;
         stopBtn.disabled  = true;
         muteBtn.disabled  = true;
@@ -582,27 +580,23 @@
     // ─── LOAD SDK ─────────────────────────────────────────────────────────────
     async function loadVapi() {
       try {
-        // Try the esbuild bundle first (works offline)
         const mod = await import("./vapi-bundle.js");
-        // --global-name=VapiSDK puts the class at mod.default or mod.VapiSDK
         VapiClass = mod.default ?? mod.Vapi ?? mod.VapiSDK;
-        if (typeof VapiClass !== "function" && VapiClass?.default)
+        if (typeof VapiClass !== "function" && VapiClass?.default) {
           VapiClass = VapiClass.default;
-        console.log("[Vapi] ✓ Loaded from vapi-bundle.js:", VapiClass?.name);
+        }
+        console.log("[Vapi] ✓ Loaded:", VapiClass?.name);
         setStatus("Ready to connect");
       } catch (e) {
         console.warn("[Vapi] vapi-bundle.js not found:", e.message);
-        setStatus("Run esbuild command below", "error");
-        showToast("⚠ Run the esbuild command in terminal first");
-        // Show instructions in the transcript box so user can't miss them
+        setStatus("Run esbuild command first", "error");
+        showToast("⚠ Run: npx esbuild node_modules/@vapi-ai/web/dist/vapi.js --bundle --format=esm --outfile=vapi-bundle.js --platform=browser");
         transcriptEl.innerHTML = `
           <p style="color:#ff4a6e;font-size:11px;line-height:1.8">
-            <b>⚠ One-time setup required:</b><br>
-            Run this in your terminal:<br><br>
+            <b>⚠ One-time setup required:</b><br>Run this in your terminal:<br><br>
             <code style="background:#1a2030;padding:6px 10px;border-radius:6px;display:block;margin-top:4px;color:#00e5a0;font-size:10px">
               npx esbuild node_modules/@vapi-ai/web/dist/vapi.js --bundle --format=esm --outfile=vapi-bundle.js --platform=browser
-            </code><br>
-            Then refresh this page.
+            </code><br>Then refresh this page.
           </p>`;
         transcriptEmpty = false;
       }
@@ -610,7 +604,7 @@
 
     await loadVapi();
 
-    // ─── START ────────────────────────────────────────────────────────────────
+    // ─── BUTTON HANDLERS ──────────────────────────────────────────────────────
     startBtn.addEventListener("click", async () => {
       if (vapi) return;
       if (!VapiClass) {
@@ -620,9 +614,10 @@
       try {
         setStatus("Connecting...", "active");
         startBtn.disabled = true;
-        vapi = new VapiClass(publicKey);
+        orb.classList.remove("error");
+        vapi = new VapiClass(PUBLIC_KEY);
         wireEvents();
-        await vapi.start(assistantId);
+        await vapi.start(ASSISTANT_ID);
       } catch (e) {
         console.error("[Vapi] start error:", e);
         setStatus("Failed to start", "error");
@@ -632,14 +627,17 @@
       }
     });
 
-    stopBtn.addEventListener("click", () => { if (vapi) vapi.stop(); });
+    stopBtn.addEventListener("click", () => {
+      if (vapi) vapi.stop();
+    });
 
     muteBtn.addEventListener("click", () => {
       if (!vapi) return;
       isMuted = !isMuted;
       vapi.setMuted(isMuted);
       muteBtn.classList.toggle("muted", isMuted);
-      muteBtn.textContent = isMuted ? "Unmute" : "Mute";
+      muteBtn.querySelector("svg").style.opacity = isMuted ? "0.4" : "1";
+      muteBtn.childNodes[muteBtn.childNodes.length - 1].textContent = isMuted ? " Muted" : " Mute";
     });
   </script>
 </body>

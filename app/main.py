@@ -1,3 +1,5 @@
+import json
+import traceback
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -9,11 +11,11 @@ app = FastAPI()
 # ─── CORS ─────────────────────────────────────────────────────────────────────
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allow all origins (simplest fix)
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
-    ),
+)
 
 
 class ScheduleRequest(BaseModel):
@@ -36,48 +38,66 @@ def root():
 
 
 # ─── VAPI WEBHOOK ─────────────────────────────────────────────────────────────
-# Vapi calls this when your assistant triggers a tool/function call.
-# Set this URL in your Vapi dashboard -> Assistant -> Server URL:
-#   http://<your-server>/vapi/webhook
+# Used only if you set a Server URL in Vapi dashboard (assistant-level webhook).
+# This handles tool-calls sent by Vapi directly to your server.
 @app.post("/vapi/webhook")
 async def vapi_webhook(request: Request):
     try:
-        body = await request.json()
-        msg_type = body.get("type")
+        raw = await request.body()
+        print(f"[Vapi Webhook RAW] {raw.decode()}")
+        body = json.loads(raw)
 
-        print(f"[Vapi] type={msg_type}")
+        # Vapi wraps payload in a "message" key — fall back to body itself
+        message = body.get("message", body)
+        msg_type = message.get("type")
 
-        # Tool / function call from assistant
+        print(f"[Vapi Webhook] type={msg_type}")
+
         if msg_type == "tool-calls":
-            tool_calls = body.get("toolCallList", [])
+            tool_calls = message.get("toolCallList", [])
             results = []
 
             for tool in tool_calls:
+                tool_id = tool.get("id")
                 fn_name = tool.get("function", {}).get("name")
                 params  = tool.get("function", {}).get("arguments", {})
 
-                print(f"  -> tool: {fn_name}, params: {params}")
+                # Vapi sometimes sends arguments as a JSON string — parse it
+                if isinstance(params, str):
+                    try:
+                        params = json.loads(params)
+                    except json.JSONDecodeError:
+                        params = {}
 
-                if fn_name == "create_event":
-                    event = create_event(
-                        name  = params.get("name"),
-                        date  = params.get("date"),
-                        time  = params.get("time"),
-                        title = params.get("title"),
-                    )
+                print(f"  -> tool_id={tool_id}, fn={fn_name}, params={params}")
+
+                if fn_name == "schedule_meeting":
+                    name  = params.get("name")
+                    date  = params.get("date")
+                    time  = params.get("time")
+                    title = params.get("title")
+
+                    if not name or not date or not time:
+                        results.append({
+                            "toolCallId": tool_id,
+                            "result": f"Error: Missing required fields — name={name}, date={date}, time={time}"
+                        })
+                        continue
+
+                    event = create_event(name=name, date=date, time=time, title=title)
                     results.append({
-                        "toolCallId": tool.get("id"),
-                        "result": f"Event created! Link: {event.get('htmlLink', 'N/A')}"
+                        "toolCallId": tool_id,
+                        "result": f"Meeting scheduled successfully! Calendar link: {event.get('htmlLink', 'N/A')}"
                     })
+
                 else:
                     results.append({
-                        "toolCallId": tool.get("id"),
+                        "toolCallId": tool_id,
                         "result": f"Unknown tool: {fn_name}"
                     })
 
             return {"results": results}
 
-        # End of call report / transcript events
         if msg_type in ("end-of-call-report", "transcript", "status-update"):
             print(f"  -> event logged: {msg_type}")
             return {"status": "received"}
@@ -86,40 +106,47 @@ async def vapi_webhook(request: Request):
 
     except Exception as e:
         print(f"[Vapi Webhook Error] {e}")
+        traceback.print_exc()
         return {"status": "error", "message": str(e)}
 
 
-# ─── SCHEDULE (original endpoint — kept intact) ───────────────────────────────
+# ─── SCHEDULE ─────────────────────────────────────────────────────────────────
+# Vapi API Tool calls this endpoint directly when the assistant triggers
+# the schedule_meeting tool (configured in Vapi Dashboard → Tools).
 @app.post("/schedule")
 async def schedule_meeting(request: Request):
     try:
-        body = await request.json()
-
-        if not body:
-            return {"status": "ready"}
+        raw = await request.body()
+        print(f"[Schedule RAW] {raw.decode()}")
+        body = json.loads(raw)
 
         name  = body.get("name")
         date  = body.get("date")
         time  = body.get("time")
         title = body.get("title")
 
+        print(f"[Schedule] name={name!r}, date={date!r}, time={time!r}, title={title!r}")
+
         if not name or not date or not time:
-            return {"status": "ready"}
+            print(f"[Schedule] ERROR: Missing required fields")
+            return {
+                "status": "error",
+                "message": f"Missing required fields — name={name}, date={date}, time={time}"
+            }
 
-        event = create_event(
-            name  = name,
-            date  = date,
-            time  = time,
-            title = title
-        )
+        event = create_event(name=name, date=date, time=time, title=title)
 
+        print(f"[Schedule] SUCCESS — event link: {event.get('htmlLink')}")
         return {
             "status": "success",
             "event_id":   event.get("id"),
-            "event_link": event.get("htmlLink")
+            "event_link": event.get("htmlLink"),
+            "message":    f"Meeting scheduled for {name} on {date} at {time}. Calendar link: {event.get('htmlLink', 'N/A')}"
         }
 
     except Exception as e:
+        print(f"[Schedule Error] {e}")
+        traceback.print_exc()
         return {
             "status": "error",
             "message": str(e)
