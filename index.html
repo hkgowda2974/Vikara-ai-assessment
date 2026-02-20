@@ -990,14 +990,19 @@ function wireVapi(){
 
     // ── 1. TOOL CALL ──
     if(msg.type === 'tool-calls' || msg.type === 'function-call'){
-      const toolList = msg.toolCallList || (msg.functionCall ? [{ function: msg.functionCall }] : []);
+      // LOG FULL RAW MESSAGE so we can see exact structure
+      console.log('[VAPI TOOL RAW]', JSON.stringify(msg, null, 2));
+      const toolList = msg.toolCallList || msg.toolCalls || (msg.functionCall ? [{ function: msg.functionCall }] : []);
       toolList.forEach(tool => {
-        const fnName = (tool.function?.name || '').toLowerCase();
-        console.log('[VAPI TOOL] called:', fnName, 'args:', tool.function?.arguments);
+        // Vapi sometimes uses tool.function, sometimes tool directly
+        const fn = tool.function || tool;
+        const fnName = (fn?.name || '').toLowerCase();
+        const fnArgs = fn?.arguments || tool?.arguments || '{}';
+        console.log('[VAPI TOOL] called:', fnName, 'raw args:', fnArgs);
         if(fnName.includes('schedule') || fnName.includes('meeting') || fnName.includes('calendar') || fnName.includes('event') || fnName.includes('book')){
-          let args = tool.function?.arguments || '{}';
+          let args = fnArgs;
           if(typeof args === 'string') { try { args = JSON.parse(args); } catch(e){ args = {}; } }
-          console.log('[VAPI TOOL] schedule_meeting args:', args);
+          console.log('[VAPI TOOL] schedule_meeting parsed args:', args);
 
           // FIX: parse date robustly — handle ISO strings AND plain date strings
           let eventDate = null;
@@ -1097,9 +1102,15 @@ function wireVapi(){
             // ── PREFERRED: use data from the tool call (most accurate) ──
             ev = { ...pendingEvent };
           } else {
-            // ── FALLBACK: parse from user speech ──
+            // ── FALLBACK: parse from user speech, then assistant buffer ──
             const gcalLink = null;
             let eventDate = parseDateFromText(allUserSpeech);
+            // If user speech didn't yield a date, try assistant's spoken confirmation
+            // (assistant often repeats the date in its confirmation message)
+            if(!eventDate && assistantBuffer) {
+              eventDate = parseDateFromText(assistantBuffer);
+              console.log('[VAPI] Date from assistantBuffer:', eventDate, '| buffer:', assistantBuffer);
+            }
             if(!eventDate) eventDate = new Date(Date.now() + 86400000);
 
             const timeNums = {one:1,two:2,three:3,four:4,five:5,six:6,seven:7,eight:8,nine:9,ten:10,eleven:11,twelve:12};
