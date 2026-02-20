@@ -4,12 +4,16 @@ from dateutil import parser
 from dateutil import tz
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
+import os
+import json
+from google.oauth2 import service_account
+from googleapiclient.discovery import build
 
-SERVICE_ACCOUNT_FILE = "service_account.json"
-SCOPES = ["https://www.googleapis.com/auth/calendar"]
+service_account_info = json.loads(os.environ["GOOGLE_SERVICE_ACCOUNT"])
 
-credentials = service_account.Credentials.from_service_account_file(
-    SERVICE_ACCOUNT_FILE, scopes=SCOPES
+credentials = service_account.Credentials.from_service_account_info(
+    service_account_info,
+    scopes=["https://www.googleapis.com/auth/calendar"]
 )
 
 service = build("calendar", "v3", credentials=credentials)
