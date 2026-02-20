@@ -1,644 +1,873 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>SAMAY</title>
-  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet"/>
-  <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>SAMAY</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+<style>
+*, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
+:root {
+  --bg: #edecea;
+  --text: #1c1c1c;
+  --text-mid: #555;
+  --text-light: #bbb;
+  --accent: #2D5A27;
+  --accent2: #3A86FF;
+  --font: 'DM Sans', sans-serif;
+}
+html, body { width:100%; height:100%; overflow:hidden; background:var(--bg); font-family:var(--font); }
 
-    :root {
-      --bg: #080c10;
-      --surface: #0e1318;
-      --border: rgba(255,255,255,0.07);
-      --accent: #00e5a0;
-      --accent-dim: rgba(0,229,160,0.12);
-      --accent-glow: rgba(0,229,160,0.35);
-      --red: #ff4a6e;
-      --red-dim: rgba(255,74,110,0.15);
-      --text: #e8edf2;
-      --muted: #556070;
-      --font-head: 'Syne', sans-serif;
-      --font-mono: 'DM Mono', monospace;
-    }
+body::after {
+  content:''; position:fixed; inset:0;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 300 300' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E");
+  pointer-events:none; z-index:900; opacity:0.45;
+}
 
-    body {
-      background: var(--bg);
-      color: var(--text);
-      font-family: var(--font-mono);
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      overflow: hidden;
-      position: relative;
-    }
+/* ══════════════════════════════════════
+   SCENE — hosts all three states
+══════════════════════════════════════ */
+.scene {
+  width:100%; height:100%;
+  position:relative;
+  display:flex; align-items:center; justify-content:center;
+}
 
-    body::before {
-      content: '';
-      position: fixed;
-      inset: 0;
-      background-image:
-        linear-gradient(rgba(0,229,160,0.03) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(0,229,160,0.03) 1px, transparent 1px);
-      background-size: 48px 48px;
-      animation: gridShift 20s linear infinite;
-      pointer-events: none;
-    }
+/* ══════════════════════════════════════
+   ORB — shared across state 1 & 2
+══════════════════════════════════════ */
+.orb-wrap {
+  position:absolute;
+  width:280px; height:280px;
+  top:50%; left:50%;
+  transform:translate(-50%, -54%) scale(1);
+  transform-origin: top left;
+  transition: top .72s cubic-bezier(.65,0,.35,1),
+              left .72s cubic-bezier(.65,0,.35,1),
+              transform .72s cubic-bezier(.65,0,.35,1),
+              opacity .5s;
+  z-index:20; cursor:pointer;
+}
+.scene.active  .orb-wrap { top:22px; left:18px; transform:translate(0,0) scale(0.1714); }
+.scene.calendar .orb-wrap { top:22px; left:18px; transform:translate(0,0) scale(0.1714); }
 
-    @keyframes gridShift {
-      0% { transform: translate(0,0); }
-      100% { transform: translate(48px, 48px); }
-    }
+.orb {
+  position:relative; width:100%; height:100%;
+  border-radius:50%; overflow:hidden;
+  -webkit-mask-image: radial-gradient(circle, black 49%, transparent 50%);
+  mask-image: radial-gradient(circle, black 49%, transparent 50%);
+  animation: orbFloat 7s ease-in-out infinite, orbBreath 8s ease-in-out infinite;
+  filter: drop-shadow(0 0 40px rgba(58,134,255,0.20)) drop-shadow(0 20px 48px rgba(0,0,0,0.22));
+  transition: filter .5s;
+}
+.scene.active .orb, .scene.calendar .orb {
+  animation: orbFloatMini 5s ease-in-out infinite;
+  filter: drop-shadow(0 2px 10px rgba(0,0,0,0.25));
+}
+@keyframes orbFloat    { 0%,100%{transform:translateY(0)}  50%{transform:translateY(-13px)} }
+@keyframes orbFloatMini{ 0%,100%{transform:translateY(0)}  50%{transform:translateY(-3px)}  }
+@keyframes orbBreath   { 0%,100%{transform:scale(1)} 33%{transform:scale(1.012)} 66%{transform:scale(0.995)} }
 
-    .orb {
-      position: fixed;
-      width: 600px;
-      height: 600px;
-      border-radius: 50%;
-      background: radial-gradient(circle, rgba(0,229,160,0.08) 0%, transparent 70%);
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      pointer-events: none;
-      transition: background 0.8s ease;
-    }
+.orb-base { position:absolute; inset:0; background:radial-gradient(ellipse at 45% 55%, #1a3d16 0%, #0d2a0a 45%, #060f05 100%); }
 
-    .orb.active {
-      background: radial-gradient(circle, rgba(0,229,160,0.18) 0%, transparent 70%);
-      animation: orbPulse 2s ease-in-out infinite;
-    }
+.blobs { position:absolute; inset:-20%; width:140%; height:140%; filter:blur(48px) saturate(1.4); will-change:transform; }
+.blob  { position:absolute; border-radius:50%; mix-blend-mode:screen; will-change:transform; }
 
-    .orb.error {
-      background: radial-gradient(circle, rgba(255,74,110,0.15) 0%, transparent 70%);
-    }
+.blob-1 { width:75%; height:75%; top:5%; left:0%; background:radial-gradient(circle,#4a9a3e 0%,#2D5A27 45%,transparent 72%); animation:blob1 18s ease-in-out infinite; opacity:.92; }
+@keyframes blob1 { 0%{transform:translate(0%,0%) scale(1)} 20%{transform:translate(18%,12%) scale(1.08)} 40%{transform:translate(28%,-5%) scale(0.95)} 60%{transform:translate(10%,22%) scale(1.12)} 80%{transform:translate(-8%,8%) scale(1.04)} 100%{transform:translate(0%,0%) scale(1)} }
 
-    @keyframes orbPulse {
-      0%, 100% { transform: translate(-50%, -50%) scale(1); }
-      50% { transform: translate(-50%, -50%) scale(1.08); }
-    }
+.blob-2 { width:70%; height:70%; top:20%; left:28%; background:radial-gradient(circle,#6ba3ff 0%,#3A86FF 40%,transparent 68%); animation:blob2 14s ease-in-out infinite; opacity:.85; }
+@keyframes blob2 { 0%{transform:translate(0%,0%) scale(1)} 25%{transform:translate(-22%,15%) scale(1.10)} 50%{transform:translate(-8%,30%) scale(0.92)} 75%{transform:translate(15%,12%) scale(1.06)} 100%{transform:translate(0%,0%) scale(1)} }
 
-    .card {
-      position: relative;
-      z-index: 10;
-      width: 420px;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 20px;
-      padding: 40px 36px 36px;
-      box-shadow: 0 0 0 1px rgba(0,229,160,0.05), 0 32px 80px rgba(0,0,0,0.6);
-      animation: fadeUp 0.6s cubic-bezier(0.16,1,0.3,1) both;
-    }
+.blob-3 { width:80%; height:65%; top:45%; left:10%; background:radial-gradient(circle,#e8ff9a 0%,#D4FC79 35%,#8ab82a 65%,transparent 78%); animation:blob3 22s ease-in-out infinite; opacity:.70; }
+@keyframes blob3 { 0%{transform:translate(0%,0%) scale(1)} 30%{transform:translate(15%,-20%) scale(1.15)} 55%{transform:translate(-10%,-8%) scale(0.90)} 80%{transform:translate(8%,18%) scale(1.08)} 100%{transform:translate(0%,0%) scale(1)} }
 
-    @keyframes fadeUp {
-      from { opacity: 0; transform: translateY(24px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
+.blob-4 { width:45%; height:45%; top:30%; left:38%; background:radial-gradient(circle,#7adc5e 0%,#3d8c2a 50%,transparent 70%); animation:blob4 10s ease-in-out infinite; opacity:.60; }
+@keyframes blob4 { 0%{transform:translate(0%,0%) scale(1)} 20%{transform:translate(-30%,-20%) scale(1.20)} 40%{transform:translate(20%,-30%) scale(0.85)} 60%{transform:translate(25%,20%) scale(1.15)} 80%{transform:translate(-15%,25%) scale(0.92)} 100%{transform:translate(0%,0%) scale(1)} }
 
-    .header {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      margin-bottom: 32px;
-    }
+.blob-5 { width:55%; height:55%; top:0%; left:40%; background:radial-gradient(circle,#a8d4ff 0%,#5a9eff 30%,#2D5A27 65%,transparent 78%); animation:blob5 16s ease-in-out infinite reverse; opacity:.55; }
+@keyframes blob5 { 0%{transform:translate(0%,0%) scale(1)} 25%{transform:translate(-20%,30%) scale(1.12)} 50%{transform:translate(10%,20%) scale(0.88)} 75%{transform:translate(20%,-10%) scale(1.10)} 100%{transform:translate(0%,0%) scale(1)} }
 
-    .logo-mark {
-      width: 36px;
-      height: 36px;
-      border-radius: 10px;
-      background: var(--accent-dim);
-      border: 1px solid rgba(0,229,160,0.25);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      flex-shrink: 0;
-    }
+.blob-6 { width:50%; height:50%; top:55%; left:45%; background:radial-gradient(circle,#1a5ccc 0%,#0a2f80 55%,transparent 72%); animation:blob6 20s ease-in-out infinite; opacity:.75; mix-blend-mode:hard-light; }
+@keyframes blob6 { 0%{transform:translate(0%,0%) scale(1)} 35%{transform:translate(-25%,-15%) scale(1.18)} 65%{transform:translate(15%,-25%) scale(0.88)} 100%{transform:translate(0%,0%) scale(1)} }
 
-    .logo-mark svg { color: var(--accent); }
+.orb-vignette { position:absolute; inset:0; border-radius:50%; background:radial-gradient(circle at 50% 50%,transparent 50%,rgba(0,0,0,0.45) 80%,rgba(0,0,0,0.75) 100%); pointer-events:none; }
+.orb-grain { position:absolute; inset:0; background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.72' numOctaves='4' seed='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23g)' opacity='1'/%3E%3C/svg%3E"); background-size:220px 220px; mix-blend-mode:overlay; opacity:.55; animation:grainShift .8s steps(1) infinite; pointer-events:none; }
+@keyframes grainShift { 0%{background-position:0 0} 10%{background-position:-55px -25px} 20%{background-position:30px 60px} 30%{background-position:-80px 10px} 40%{background-position:20px -70px} 50%{background-position:-40px 50px} 60%{background-position:70px -30px} 70%{background-position:-10px 80px} 80%{background-position:50px -50px} 90%{background-position:-60px 20px} 100%{background-position:0 0} }
+.orb-svg-grain { position:absolute; inset:0; pointer-events:none; opacity:.30; mix-blend-mode:soft-light; }
+.orb-gloss { position:absolute; top:6%; left:8%; width:48%; height:38%; border-radius:50%; background:radial-gradient(ellipse at 35% 30%,rgba(255,255,255,0.28) 0%,rgba(255,255,255,0.08) 45%,transparent 70%); filter:blur(8px); pointer-events:none; animation:glossShift 12s ease-in-out infinite; }
+@keyframes glossShift { 0%,100%{transform:translate(0%,0%) scale(1); opacity:.9} 40%{transform:translate(4%,6%) scale(1.1); opacity:1} 70%{transform:translate(-3%,2%) scale(.92); opacity:.8} }
 
-    .brand h1 {
-      font-family: var(--font-head);
-      font-size: 18px;
-      font-weight: 800;
-      letter-spacing: -0.3px;
-      color: var(--text);
-    }
+/* ══════════════════════════════════════
+   STATE 1 — IDLE BAR
+══════════════════════════════════════ */
+.idle-bar {
+  position:absolute; bottom:56px; left:50%; transform:translateX(-50%);
+  display:flex; align-items:center; gap:10px;
+  z-index:30; opacity:1; pointer-events:all;
+  transition:opacity .3s, transform .3s;
+}
+.scene.active .idle-bar, .scene.calendar .idle-bar { opacity:0; pointer-events:none; transform:translateX(-50%) translateY(10px); }
 
-    .brand p {
-      font-size: 11px;
-      color: var(--muted);
-      letter-spacing: 0.5px;
-      margin-top: 1px;
-    }
+.btn-phone {
+  width:50px; height:50px; border-radius:50%; border:none; background:#fff;
+  box-shadow:0 1px 8px rgba(0,0,0,0.10),0 0 0 1px rgba(0,0,0,0.05);
+  cursor:pointer; flex-shrink:0; display:flex; align-items:center; justify-content:center;
+  transition:background .15s, transform .15s;
+}
+.btn-phone:hover { background:#f5f5f5; transform:scale(1.04); }
+.btn-phone svg { color:#111; }
 
-    .status-bar {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      padding: 10px 14px;
-      background: rgba(255,255,255,0.03);
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      margin-bottom: 24px;
-      font-size: 12px;
-      color: var(--muted);
-      transition: all 0.3s ease;
-    }
+.input-idle {
+  width:240px; padding:13px 20px; border-radius:100px; border:none; background:#fff;
+  box-shadow:0 1px 8px rgba(0,0,0,0.09),0 0 0 1px rgba(0,0,0,0.05);
+  font-family:var(--font); font-size:15px; color:var(--text); outline:none;
+  transition:box-shadow .2s;
+}
+.input-idle::placeholder { color:var(--text-light); }
+.input-idle:focus { box-shadow:0 2px 16px rgba(0,0,0,0.12),0 0 0 1px rgba(0,0,0,0.08); }
 
-    .status-bar.active {
-      border-color: rgba(0,229,160,0.25);
-      color: var(--accent);
-      background: var(--accent-dim);
-    }
+/* ══════════════════════════════════════
+   STATE 2 — ACTIVE CONVERSATION
+══════════════════════════════════════ */
+.convo-area {
+  position:absolute; inset:0;
+  display:flex; flex-direction:column;
+  padding:90px 28px 90px 24px;
+  opacity:0; pointer-events:none;
+  transition:opacity .42s .26s; z-index:10;
+}
+.scene.active .convo-area { opacity:1; pointer-events:all; }
 
-    .status-bar.error {
-      border-color: rgba(255,74,110,0.25);
-      color: var(--red);
-      background: var(--red-dim);
-    }
+.transcript { flex:1; overflow-y:auto; display:flex; flex-direction:column; gap:18px; }
+.transcript::-webkit-scrollbar { display:none; }
 
-    .dot {
-      width: 7px;
-      height: 7px;
-      border-radius: 50%;
-      background: var(--muted);
-      flex-shrink: 0;
-      transition: background 0.3s;
-    }
+.msg { font-size:16px; line-height:1.68; color:var(--text); max-width:92%; animation:msgIn .38s cubic-bezier(.16,1,.3,1) both; }
+.msg.user { align-self:flex-end; font-size:15px; color:var(--text-mid); }
+.msg.ai   { align-self:flex-start; }
+@keyframes msgIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
 
-    .status-bar.active .dot {
-      background: var(--accent);
-      animation: blink 1.2s ease-in-out infinite;
-    }
+.typing { display:flex; gap:5px; align-items:center; padding:3px 0; opacity:0; pointer-events:none; transition:opacity .22s; align-self:flex-start; }
+.typing.show { opacity:1; }
+.typing span { width:7px; height:7px; border-radius:50%; background:var(--text-light); animation:td 1.2s ease-in-out infinite; }
+.typing span:nth-child(2){animation-delay:.18s} .typing span:nth-child(3){animation-delay:.36s}
+@keyframes td { 0%,80%,100%{transform:translateY(0);opacity:.35} 40%{transform:translateY(-6px);opacity:1} }
 
-    .status-bar.error .dot { background: var(--red); }
+.active-bar {
+  position:absolute; bottom:28px; left:24px; right:24px;
+  display:flex; align-items:center; gap:10px;
+  z-index:30; opacity:0; transform:translateY(10px); pointer-events:none;
+  transition:opacity .35s .22s, transform .35s .22s;
+}
+.scene.active .active-bar { opacity:1; transform:translateY(0); pointer-events:all; }
 
-    @keyframes blink {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.3; }
-    }
+.btn-hangup {
+  width:50px; height:50px; border-radius:50%; border:none; background:#fff;
+  box-shadow:0 1px 8px rgba(0,0,0,0.10),0 0 0 1px rgba(0,0,0,0.05);
+  cursor:pointer; flex-shrink:0; display:flex; align-items:center; justify-content:center;
+  transition:background .15s, transform .15s;
+}
+.btn-hangup:hover { background:#f5f5f5; transform:scale(1.04); }
+.btn-hangup svg { color:#111; }
 
-    .visualizer {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 4px;
-      height: 56px;
-      margin-bottom: 24px;
-      opacity: 0.3;
-      transition: opacity 0.4s;
-    }
+.input-active {
+  flex:1; padding:13px 20px; border-radius:100px;
+  border:1.5px solid rgba(60,130,220,0.55); background:#fff;
+  font-family:var(--font); font-size:15px; color:var(--text); outline:none;
+  box-shadow:0 0 0 3px rgba(60,130,220,0.09);
+  transition:border-color .2s, box-shadow .2s;
+}
+.input-active::placeholder { color:var(--text-light); }
+.input-active:focus { border-color:rgba(60,130,220,0.72); box-shadow:0 0 0 4px rgba(60,130,220,0.13); }
 
-    .visualizer.active { opacity: 1; }
+/* ══════════════════════════════════════
+   STATE 3 — CALENDAR VIEW
+══════════════════════════════════════ */
+.calendar-view {
+  position:absolute; inset:0;
+  display:flex; flex-direction:column;
+  padding:72px 20px 24px 20px;
+  opacity:0; pointer-events:none;
+  transition:opacity .5s .1s;
+  z-index:10;
+  overflow:hidden;
+}
+.scene.calendar .calendar-view { opacity:1; pointer-events:all; }
 
-    .bar {
-      width: 3px;
-      border-radius: 2px;
-      background: var(--accent);
-      animation: none;
-      height: 4px;
-      transition: height 0.1s;
-    }
+/* Month header row (sits below the small orb) */
+.cal-header {
+  display:flex; align-items:center; justify-content:space-between;
+  margin-bottom:18px;
+}
+.cal-month-label {
+  font-size:20px; font-weight:600; color:var(--text);
+  letter-spacing:-0.3px;
+}
+.cal-nav-btn {
+  width:34px; height:34px; border-radius:50%; border:none;
+  background:rgba(0,0,0,0.05); cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+  transition:background .15s;
+}
+.cal-nav-btn:hover { background:rgba(0,0,0,0.10); }
+.cal-nav-btn svg { color:#555; }
 
-    .visualizer.active .bar {
-      animation: wave 0.9s ease-in-out infinite;
-    }
+/* Day-of-week headers */
+.cal-dow {
+  display:grid; grid-template-columns:repeat(7,1fr);
+  margin-bottom:8px;
+}
+.cal-dow span {
+  text-align:center; font-size:11px; font-weight:500;
+  color:var(--text-light); letter-spacing:.5px; text-transform:uppercase;
+  padding:4px 0;
+}
 
-    .bar:nth-child(1)  { animation-delay: 0s;    --h: 12px; }
-    .bar:nth-child(2)  { animation-delay: 0.07s; --h: 28px; }
-    .bar:nth-child(3)  { animation-delay: 0.14s; --h: 40px; }
-    .bar:nth-child(4)  { animation-delay: 0.21s; --h: 20px; }
-    .bar:nth-child(5)  { animation-delay: 0.28s; --h: 44px; }
-    .bar:nth-child(6)  { animation-delay: 0.35s; --h: 32px; }
-    .bar:nth-child(7)  { animation-delay: 0.28s; --h: 44px; }
-    .bar:nth-child(8)  { animation-delay: 0.21s; --h: 20px; }
-    .bar:nth-child(9)  { animation-delay: 0.14s; --h: 40px; }
-    .bar:nth-child(10) { animation-delay: 0.07s; --h: 28px; }
-    .bar:nth-child(11) { animation-delay: 0s;    --h: 12px; }
+/* Calendar grid */
+.cal-grid {
+  display:grid; grid-template-columns:repeat(7,1fr);
+  gap:4px; flex:1;
+}
 
-    @keyframes wave {
-      0%, 100% { height: 4px; }
-      50% { height: var(--h, 20px); }
-    }
+.cal-day {
+  aspect-ratio:1;
+  border-radius:10px;
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  cursor:pointer; position:relative;
+  transition:background .15s, transform .15s;
+  font-size:14px; font-weight:400; color:var(--text);
+}
+.cal-day:hover { background:rgba(0,0,0,0.05); }
+.cal-day.empty { cursor:default; }
+.cal-day.today {
+  background:rgba(45,90,39,0.10);
+  color:var(--accent); font-weight:600;
+}
+.cal-day.today::after {
+  content:''; position:absolute; bottom:5px;
+  width:4px; height:4px; border-radius:50%; background:var(--accent);
+}
 
-    .transcript-box {
-      background: rgba(255,255,255,0.02);
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      padding: 14px;
-      height: 120px;
-      overflow-y: auto;
-      font-size: 12px;
-      line-height: 1.7;
-      color: var(--muted);
-      margin-bottom: 24px;
-      scroll-behavior: smooth;
-    }
+/* Scheduled event on a day */
+.cal-day.has-event {
+  background:rgba(45,90,39,0.12);
+  cursor:pointer;
+}
+.cal-day.has-event:hover { background:rgba(45,90,39,0.20); transform:scale(1.06); }
 
-    .transcript-box::-webkit-scrollbar { width: 4px; }
-    .transcript-box::-webkit-scrollbar-track { background: transparent; }
-    .transcript-box::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+.event-dot {
+  width:5px; height:5px; border-radius:50%;
+  background:var(--accent); margin-top:2px;
+}
 
-    .transcript-line { margin-bottom: 4px; }
-    .transcript-line .role { color: var(--accent); margin-right: 6px; font-weight: 500; }
-    .transcript-line.user .role { color: #7eb8ff; }
+.event-chip {
+  position:absolute;
+  bottom:calc(100% + 6px); left:50%;
+  transform:translateX(-50%);
+  background:#fff;
+  border:1px solid rgba(0,0,0,0.08);
+  border-radius:10px;
+  padding:6px 10px;
+  white-space:nowrap;
+  font-size:11px; font-weight:500; color:var(--text);
+  box-shadow:0 4px 16px rgba(0,0,0,0.12);
+  pointer-events:none;
+  opacity:0; transform:translateX(-50%) translateY(4px);
+  transition:opacity .2s, transform .2s;
+  z-index:50;
+}
+.cal-day.has-event:hover .event-chip {
+  opacity:1; transform:translateX(-50%) translateY(0);
+}
 
-    .placeholder-text {
-      color: var(--muted);
-      font-style: italic;
-      opacity: 0.5;
-      font-size: 11px;
-    }
+/* Event pill inside day */
+.event-pill {
+  width:80%; margin-top:2px;
+  background:var(--accent);
+  border-radius:4px;
+  padding:1px 3px;
+  font-size:8px; color:#fff; font-weight:500;
+  text-align:center;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
 
-    .btn-row {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 10px;
-    }
+/* Scheduled confirmation banner */
+.sched-banner {
+  background:#fff;
+  border-radius:14px;
+  padding:14px 16px;
+  display:flex; align-items:center; gap:12px;
+  box-shadow:0 2px 16px rgba(0,0,0,0.09);
+  margin-bottom:16px;
+  animation:bannerIn .5s cubic-bezier(.16,1,.3,1) both;
+  cursor:pointer;
+  transition:box-shadow .2s, transform .15s;
+  border:1px solid rgba(45,90,39,0.15);
+}
+.sched-banner:hover { box-shadow:0 4px 24px rgba(0,0,0,0.13); transform:translateY(-1px); }
+@keyframes bannerIn { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} }
 
-    .btn {
-      font-family: var(--font-mono);
-      font-size: 13px;
-      font-weight: 500;
-      padding: 14px 20px;
-      border-radius: 12px;
-      border: 1px solid transparent;
-      cursor: pointer;
-      transition: all 0.2s ease;
-      letter-spacing: 0.3px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
-    }
+.sched-icon {
+  width:40px; height:40px; border-radius:10px;
+  background:rgba(45,90,39,0.12);
+  display:flex; align-items:center; justify-content:center; flex-shrink:0;
+}
+.sched-icon svg { color:var(--accent); }
 
-    .btn:disabled { opacity: 0.35; cursor: not-allowed; }
+.sched-info { flex:1; }
+.sched-title { font-size:14px; font-weight:600; color:var(--text); }
+.sched-sub   { font-size:12px; color:var(--text-mid); margin-top:2px; }
 
-    .btn-start {
-      background: var(--accent);
-      color: #000;
-      border-color: var(--accent);
-      grid-column: span 2;
-    }
+.sched-arrow svg { color:var(--text-light); }
 
-    .btn-start:hover:not(:disabled) {
-      box-shadow: 0 0 24px var(--accent-glow);
-      transform: translateY(-1px);
-    }
-
-    .btn-stop {
-      background: var(--red-dim);
-      color: var(--red);
-      border-color: rgba(255,74,110,0.25);
-    }
-
-    .btn-stop:hover:not(:disabled) {
-      background: rgba(255,74,110,0.25);
-    }
-
-    .btn-mute {
-      background: rgba(255,255,255,0.04);
-      color: var(--text);
-      border-color: var(--border);
-    }
-
-    .btn-mute:hover:not(:disabled) { background: rgba(255,255,255,0.08); }
-    .btn-mute.muted { color: var(--accent); border-color: rgba(0,229,160,0.25); }
-
-    .footer-meta {
-      display: flex;
-      justify-content: space-between;
-      margin-top: 20px;
-      font-size: 10px;
-      color: var(--muted);
-      opacity: 0.6;
-    }
-
-    .backend-status {
-      display: flex;
-      align-items: center;
-      gap: 5px;
-    }
-
-    .backend-dot {
-      width: 5px;
-      height: 5px;
-      border-radius: 50%;
-      background: var(--muted);
-    }
-
-    .backend-dot.ok   { background: var(--accent); }
-    .backend-dot.fail { background: var(--red); }
-
-    .toast {
-      position: fixed;
-      bottom: 24px;
-      left: 50%;
-      transform: translateX(-50%) translateY(80px);
-      background: #1a2030;
-      border: 1px solid var(--border);
-      color: var(--text);
-      padding: 10px 18px;
-      border-radius: 8px;
-      font-size: 12px;
-      z-index: 999;
-      transition: transform 0.35s cubic-bezier(0.16,1,0.3,1);
-      white-space: nowrap;
-    }
-
-    .toast.show { transform: translateX(-50%) translateY(0); }
-  </style>
+/* ══════════════════════════════════════
+   TOAST
+══════════════════════════════════════ */
+.toast {
+  position:fixed; bottom:24px; left:50%;
+  transform:translateX(-50%) translateY(52px);
+  background:rgba(18,18,18,0.84); backdrop-filter:blur(10px);
+  color:#fff; padding:9px 20px; border-radius:100px;
+  font-size:12.5px; z-index:999;
+  transition:transform .35s cubic-bezier(.16,1,.3,1); white-space:nowrap;
+}
+.toast.show { transform:translateX(-50%) translateY(0); }
+</style>
 </head>
 <body>
 
-  <div class="orb" id="orb"></div>
+<!-- SVG noise filter -->
+<svg style="position:absolute;width:0;height:0;overflow:hidden" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <filter id="orb-noise" x="0%" y="0%" width="100%" height="100%" color-interpolation-filters="sRGB">
+      <feTurbulence type="fractalNoise" baseFrequency="0.65 0.68" numOctaves="4" seed="5" stitchTiles="stitch" result="noise">
+        <animate attributeName="seed" values="5;12;7;19;3;5" dur="4s" repeatCount="indefinite"/>
+      </feTurbulence>
+      <feColorMatrix type="saturate" values="0" in="noise" result="grey"/>
+      <feComponentTransfer in="grey" result="boosted">
+        <feFuncR type="linear" slope="1.4" intercept="-0.2"/>
+        <feFuncG type="linear" slope="1.4" intercept="-0.2"/>
+        <feFuncB type="linear" slope="1.4" intercept="-0.2"/>
+      </feComponentTransfer>
+      <feBlend in="SourceGraphic" in2="boosted" mode="overlay" result="blended"/>
+      <feComposite in="blended" in2="SourceGraphic" operator="in"/>
+    </filter>
+  </defs>
+</svg>
 
-  <div class="card">
-    <div class="header">
-      <div class="logo-mark">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/>
-          <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
-          <line x1="12" y1="19" x2="12" y2="23"/>
-          <line x1="8" y1="23" x2="16" y2="23"/>
-        </svg>
+<div class="scene" id="scene">
+
+  <!-- ══ ORB (persists across all states) ══ -->
+  <div class="orb-wrap" id="orbWrap">
+    <div class="orb" id="orb">
+      <div class="orb-base"></div>
+      <div class="blobs" id="blobs">
+        <div class="blob blob-1"></div>
+        <div class="blob blob-2"></div>
+        <div class="blob blob-3"></div>
+        <div class="blob blob-4"></div>
+        <div class="blob blob-5"></div>
+        <div class="blob blob-6"></div>
       </div>
-      <div class="brand">
-        <h1>SAMAY</h1>
-        <p>AI Scheduling AGENT</p>
-      </div>
-    </div>
-
-    <div class="status-bar" id="statusBar">
-      <div class="dot"></div>
-      <span id="statusText">Ready to connect</span>
-    </div>
-
-    <div class="visualizer" id="visualizer">
-      <div class="bar"></div>
-      <div class="bar"></div>
-      <div class="bar"></div>
-      <div class="bar"></div>
-      <div class="bar"></div>
-      <div class="bar"></div>
-      <div class="bar"></div>
-      <div class="bar"></div>
-      <div class="bar"></div>
-      <div class="bar"></div>
-      <div class="bar"></div>
-    </div>
-
-    <div class="transcript-box" id="transcript">
-      <p class="placeholder-text">Transcript will appear here during your call...</p>
-    </div>
-
-    <div class="btn-row">
-      <button class="btn btn-start" id="startBtn">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/>
-          <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
-        </svg>
-        Start Call
-      </button>
-      <button class="btn btn-stop" id="stopBtn" disabled>
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-          <rect x="3" y="3" width="18" height="18" rx="3"/>
-        </svg>
-        End Call
-      </button>
-      <button class="btn btn-mute" id="muteBtn" disabled>
-        <svg id="muteIcon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/>
-          <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
-          <line x1="12" y1="19" x2="12" y2="23"/>
-        </svg>
-        Mute
-      </button>
-    </div>
-
-    <div class="footer-meta">
-      <span id="callTimer">—</span>
-      <div class="backend-status">
-        <div class="backend-dot" id="backendDot"></div>
-        <span id="backendLabel">checking backend...</span>
-      </div>
+      <div class="orb-vignette"></div>
+      <div class="orb-grain"></div>
+      <svg class="orb-svg-grain" viewBox="0 0 280 280" xmlns="http://www.w3.org/2000/svg">
+        <rect width="280" height="280" fill="white" filter="url(#orb-noise)" opacity="0.6"/>
+      </svg>
+      <div class="orb-gloss"></div>
     </div>
   </div>
 
-  <div class="toast" id="toast"></div>
+  <!-- ══ STATE 1: IDLE BAR ══ -->
+  <div class="idle-bar" id="idleBar">
+    <button class="btn-phone" id="callBtn">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M6.62 10.79a15.05 15.05 0 006.59 6.59l2.2-2.2a1 1 0 011.01-.25 11.36 11.36 0 003.56.57 1 1 0 011 1V20a1 1 0 01-1 1A17 17 0 013 4a1 1 0 011-1h3.5a1 1 0 011 1c0 1.25.2 2.45.57 3.57a1 1 0 01-.25 1.01l-2.2 2.21z"/>
+      </svg>
+    </button>
+    <input class="input-idle" id="idleInput" type="text" placeholder="Or type a message..." autocomplete="off"/>
+  </div>
 
-  <script type="module">
-    // ─── CONFIG ───────────────────────────────────────────────────────────────
-    // Update FASTAPI_BASE_URL to your ngrok URL when sharing externally,
-    // or keep localhost for local testing.
-    const FASTAPI_BASE_URL = "https://vikara-ai-assessment.onrender.com";
-    const ASSISTANT_ID     = "f08de70a-4804-440d-89b1-5c6463f00a65";
-    const PUBLIC_KEY       = "1135bec2-5e08-4bdb-854e-1a311db0ff0b";
+  <!-- ══ STATE 2: ACTIVE CONVERSATION ══ -->
+  <div class="convo-area">
+    <div class="transcript" id="transcript">
+      <div class="typing" id="typing"><span></span><span></span><span></span></div>
+    </div>
+  </div>
+  <div class="active-bar">
+    <button class="btn-hangup" id="hangupBtn">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M10.68 13.31a16 16 0 003.41 2.6l1.27-1.27a2 2 0 012.11-.45 12.84 12.84 0 002.81.7 2 2 0 012 2v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.42 19.42 0 013.43 9.64a19.86 19.86 0 01-3.07-8.67A2 2 0 012.18 0h3a2 2 0 012 1.72 12.84 12.84 0 00.7 2.81 2 2 0 01-.45 2.11L6.18 7.91"/>
+        <line x1="1" y1="1" x2="23" y2="23"/>
+      </svg>
+    </button>
+    <input class="input-active" id="activeInput" type="text" placeholder="Type a message..." autocomplete="off"/>
+  </div>
 
-    // ─── STATE ────────────────────────────────────────────────────────────────
-    let vapi            = null;
-    let VapiClass       = null;
-    let isMuted         = false;
-    let callStart       = null;
-    let timerInterval   = null;
-    let transcriptEmpty = true;
+  <!-- ══ STATE 3: CALENDAR VIEW ══ -->
+  <div class="calendar-view" id="calendarView">
 
-    // ─── ELEMENTS ─────────────────────────────────────────────────────────────
-    const startBtn     = document.getElementById("startBtn");
-    const stopBtn      = document.getElementById("stopBtn");
-    const muteBtn      = document.getElementById("muteBtn");
-    const statusBar    = document.getElementById("statusBar");
-    const statusText   = document.getElementById("statusText");
-    const visualizer   = document.getElementById("visualizer");
-    const transcriptEl = document.getElementById("transcript");
-    const orb          = document.getElementById("orb");
-    const callTimer    = document.getElementById("callTimer");
-    const backendDot   = document.getElementById("backendDot");
-    const backendLabel = document.getElementById("backendLabel");
-    const toast        = document.getElementById("toast");
+    <!-- Scheduled event banner (top) -->
+    <div class="sched-banner" id="schedBanner" style="display:none" onclick="openCalendar()">
+      <div class="sched-icon">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+          <polyline points="9 16 11 18 15 14"/>
+        </svg>
+      </div>
+      <div class="sched-info">
+        <div class="sched-title" id="schedTitle">Event Scheduled</div>
+        <div class="sched-sub"  id="schedSub">Tap to open in Calendar</div>
+      </div>
+      <div class="sched-arrow">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+      </div>
+    </div>
 
-    // ─── HELPERS ──────────────────────────────────────────────────────────────
-    function showToast(msg, duration = 3500) {
-      toast.textContent = msg;
-      toast.classList.add("show");
-      setTimeout(() => toast.classList.remove("show"), duration);
+    <!-- Month navigation -->
+    <div class="cal-header">
+      <button class="cal-nav-btn" onclick="changeMonth(-1)">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+      </button>
+      <span class="cal-month-label" id="calMonthLabel"></span>
+      <button class="cal-nav-btn" onclick="changeMonth(1)">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+      </button>
+    </div>
+
+    <!-- Day of week headers -->
+    <div class="cal-dow">
+      <span>Su</span><span>Mo</span><span>Tu</span><span>We</span><span>Th</span><span>Fr</span><span>Sa</span>
+    </div>
+
+    <!-- Calendar grid -->
+    <div class="cal-grid" id="calGrid"></div>
+  </div>
+
+</div>
+<div class="toast" id="toast"></div>
+
+<script type="module">
+/* ═══════════════════════════════════
+   CONFIG
+═══════════════════════════════════ */
+const FASTAPI_BASE_URL = "http://localhost:8000";
+const ASSISTANT_ID     = "f08de70a-4804-440d-89b1-5c6463f00a65";
+const PUBLIC_KEY       = "1135bec2-5e08-4bdb-854e-1a311db0ff0b";
+
+/* ═══════════════════════════════════
+   STATE
+═══════════════════════════════════ */
+let vapi = null, VapiClass = null;
+let appState = 'idle'; // idle | active | calendar
+let greeted  = false;
+
+// Scheduled event data
+let scheduledEvent = null; // { title, date: Date, description }
+
+// Calendar display month
+let calYear  = new Date().getFullYear();
+let calMonth = new Date().getMonth(); // 0-indexed
+
+/* ═══════════════════════════════════
+   ELEMENTS
+═══════════════════════════════════ */
+const scene       = document.getElementById("scene");
+const transcript  = document.getElementById("transcript");
+const typing      = document.getElementById("typing");
+const activeInput = document.getElementById("activeInput");
+const idleInput   = document.getElementById("idleInput");
+const callBtn     = document.getElementById("callBtn");
+const hangupBtn   = document.getElementById("hangupBtn");
+const blobs       = document.getElementById("blobs");
+const toastEl     = document.getElementById("toast");
+const calGrid     = document.getElementById("calGrid");
+const calLabel    = document.getElementById("calMonthLabel");
+const schedBanner = document.getElementById("schedBanner");
+const schedTitle  = document.getElementById("schedTitle");
+const schedSub    = document.getElementById("schedSub");
+
+/* ═══════════════════════════════════
+   MOUSE PARALLAX (idle only)
+═══════════════════════════════════ */
+let mx=0, my=0, tx=0, ty=0;
+document.addEventListener('mousemove', e => {
+  const r = document.getElementById("orb").getBoundingClientRect();
+  mx = (e.clientX - r.left - r.width/2)  / (r.width/2);
+  my = (e.clientY - r.top  - r.height/2) / (r.height/2);
+});
+(function orbTick(){
+  tx += (mx-tx)*0.04; ty += (my-ty)*0.04;
+  if(appState === 'idle') {
+    blobs.style.transform = `translate(calc(-20% + ${tx*10}px), calc(-20% + ${ty*8}px))`;
+  } else {
+    blobs.style.transform = '';
+  }
+  requestAnimationFrame(orbTick);
+})();
+
+/* ═══════════════════════════════════
+   HELPERS
+═══════════════════════════════════ */
+function showToast(msg, d=3000) {
+  toastEl.textContent=msg; toastEl.classList.add("show");
+  setTimeout(()=>toastEl.classList.remove("show"),d);
+}
+
+function setState(s) {
+  appState = s;
+  scene.classList.remove('active','calendar');
+  if(s === 'active')   scene.classList.add('active');
+  if(s === 'calendar') scene.classList.add('calendar');
+}
+
+function goActive() {
+  if(appState==='active')return;
+  setState('active');
+  setTimeout(()=>activeInput.focus(), 680);
+}
+
+function goIdle() {
+  greeted = false; vapi = null;
+  setState('idle');
+  Array.from(transcript.children).forEach(c=>{if(c!==typing)c.remove();});
+  typing.classList.remove("show");
+  activeInput.value="";
+}
+
+function goCalendar(event) {
+  scheduledEvent = event;
+  // Jump calendar to the event's month
+  calYear  = event.date.getFullYear();
+  calMonth = event.date.getMonth();
+  renderCalendar();
+  setState('calendar');
+  // Show banner
+  schedBanner.style.display = 'flex';
+  schedTitle.textContent = event.title;
+  const opts = { weekday:'long', year:'numeric', month:'long', day:'numeric' };
+  schedSub.textContent = event.date.toLocaleDateString('en-US', opts) + (event.time ? ' · ' + event.time : '') + ' — Tap to open in Calendar';
+}
+
+/* ═══════════════════════════════════
+   TRANSCRIPT
+═══════════════════════════════════ */
+function showTyping(v) {
+  transcript.appendChild(typing);
+  typing.classList.toggle("show",v);
+  transcript.scrollTop = transcript.scrollHeight;
+}
+function addMsg(role, text) {
+  if(transcript.contains(typing))transcript.removeChild(typing);
+  const d=document.createElement("div");
+  d.className="msg "+role; d.textContent=text;
+  transcript.appendChild(d); transcript.appendChild(typing);
+  transcript.scrollTop=transcript.scrollHeight;
+}
+function typeWrite(text, speed=24) {
+  return new Promise(res=>{
+    if(transcript.contains(typing))transcript.removeChild(typing);
+    const d=document.createElement("div"); d.className="msg ai";
+    transcript.appendChild(d); transcript.appendChild(typing);
+    let i=0;
+    const tick=()=>{
+      if(i<text.length){d.textContent+=text[i++];transcript.scrollTop=9999;setTimeout(tick,speed);}
+      else res();
+    };
+    tick();
+  });
+}
+
+async function doGreet() {
+  if(greeted)return; greeted=true;
+  goActive();
+  showTyping(true);
+  await new Promise(r=>setTimeout(r,900));
+  showTyping(false);
+  await typeWrite("Hey there! I'm SAMAY, your AI scheduling assistant. How can I help you schedule today?");
+}
+
+/* ═══════════════════════════════════
+   CALENDAR RENDERER
+═══════════════════════════════════ */
+const MONTHS = ["January","February","March","April","May","June",
+                "July","August","September","October","November","December"];
+
+function renderCalendar() {
+  const today = new Date();
+  const firstDay = new Date(calYear, calMonth, 1).getDay(); // 0=Sun
+  const daysInMonth = new Date(calYear, calMonth+1, 0).getDate();
+
+  calLabel.textContent = `${MONTHS[calMonth]} ${calYear}`;
+  calGrid.innerHTML = '';
+
+  // Empty cells before first day
+  for(let i=0; i<firstDay; i++){
+    const empty = document.createElement('div');
+    empty.className='cal-day empty';
+    calGrid.appendChild(empty);
+  }
+
+  // Day cells
+  for(let d=1; d<=daysInMonth; d++){
+    const cell = document.createElement('div');
+    cell.className = 'cal-day';
+    cell.textContent = d;
+
+    // Today marker
+    if(d===today.getDate() && calMonth===today.getMonth() && calYear===today.getFullYear()){
+      cell.classList.add('today');
     }
 
-    function setStatus(label, type = "") {
-      statusText.textContent = label;
-      statusBar.className = "status-bar" + (type ? " " + type : "");
-    }
-
-    function setActive(active) {
-      visualizer.classList.toggle("active", active);
-      orb.classList.toggle("active", active);
-    }
-
-    function appendTranscript(role, text) {
-      if (transcriptEmpty) {
-        transcriptEl.innerHTML = "";
-        transcriptEmpty = false;
+    // Scheduled event marker
+    if(scheduledEvent) {
+      const ev = scheduledEvent.date;
+      if(d===ev.getDate() && calMonth===ev.getMonth() && calYear===ev.getFullYear()){
+        cell.classList.add('has-event');
+        // Event pill
+        const pill = document.createElement('div');
+        pill.className = 'event-pill';
+        pill.textContent = scheduledEvent.title;
+        cell.appendChild(pill);
+        // Hover chip
+        const chip = document.createElement('div');
+        chip.className = 'event-chip';
+        chip.textContent = `📅 ${scheduledEvent.title}${scheduledEvent.time ? ' · '+scheduledEvent.time : ''}`;
+        cell.appendChild(chip);
+        // Click → open calendar
+        cell.addEventListener('click', openCalendar);
+        cell.title = 'Click to open in Calendar';
       }
-      const line = document.createElement("div");
-      line.className = "transcript-line " + role;
-      line.innerHTML = `<span class="role">${role === "user" ? "YOU" : "AI"}:</span>${text}`;
-      transcriptEl.appendChild(line);
-      transcriptEl.scrollTop = transcriptEl.scrollHeight;
     }
 
-    function startTimer() {
-      callStart = Date.now();
-      timerInterval = setInterval(() => {
-        const s = Math.floor((Date.now() - callStart) / 1000);
-        callTimer.textContent =
-          String(Math.floor(s / 60)).padStart(2, "0") + ":" + String(s % 60).padStart(2, "0");
-      }, 1000);
-    }
+    calGrid.appendChild(cell);
+  }
+}
 
-    function stopTimer() {
-      clearInterval(timerInterval);
-      callTimer.textContent = "—";
-    }
+window.changeMonth = function(dir) {
+  calMonth += dir;
+  if(calMonth > 11){ calMonth=0; calYear++; }
+  if(calMonth < 0) { calMonth=11; calYear--; }
+  renderCalendar();
+};
 
-    // ─── BACKEND PING ─────────────────────────────────────────────────────────
-    async function pingBackend() {
-      try {
-        const r = await fetch(FASTAPI_BASE_URL + "/health");
-        if (r.ok) {
-          backendDot.className     = "backend-dot ok";
-          backendLabel.textContent = "backend online";
-        } else {
-          backendDot.className     = "backend-dot fail";
-          backendLabel.textContent = "backend error";
+/* ═══════════════════════════════════
+   OPEN REAL CALENDAR
+═══════════════════════════════════ */
+window.openCalendar = function() {
+  if(!scheduledEvent) return;
+  const ev = scheduledEvent;
+  const d  = ev.date;
+
+  // Format for Google Calendar
+  // Date format: YYYYMMDD
+  const pad = n => String(n).padStart(2,'0');
+  const dateStr = `${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}`;
+
+  // Try to figure out time (default to 10am if not specified)
+  let startTime = ev.time || '10:00';
+  const [hh, mm] = startTime.replace(/[apm\s]/gi,'').split(':');
+  const isPM = /pm/i.test(startTime);
+  let h = parseInt(hh);
+  if(isPM && h<12) h+=12;
+  if(!isPM && h===12) h=0;
+  const startDT = `${dateStr}T${pad(h)}${pad(parseInt(mm||0))}00`;
+  const endH    = (h+1)%24;
+  const endDT   = `${dateStr}T${pad(endH)}${pad(parseInt(mm||0))}00`;
+
+  const title = encodeURIComponent(ev.title);
+  const details = encodeURIComponent(ev.description || 'Scheduled via SAMAY');
+  const gcalURL = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${startDT}/${endDT}&details=${details}`;
+
+  window.open(gcalURL, '_blank');
+};
+
+/* ═══════════════════════════════════
+   EVENT PARSER
+   Tries to detect scheduling intent from transcript
+═══════════════════════════════════ */
+function parseScheduleFromText(text) {
+  // Patterns: "scheduled ... on [date]", "set up ... for [date]", etc.
+  const lower = text.toLowerCase();
+  const scheduled = lower.includes('scheduled') || lower.includes('booked') ||
+                    lower.includes('set up') || lower.includes('confirmed') ||
+                    lower.includes('added to') || lower.includes('i\'ve scheduled');
+  if(!scheduled) return null;
+
+  // Try to extract a date
+  const months = { jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11,
+                   january:0,february:1,march:2,april:3,june:5,july:6,august:7,september:8,october:9,november:10,december:11 };
+  const today = new Date();
+  let eventDate = null;
+
+  // Match "March 5", "5th March", "March 5th", etc.
+  const dateMatch = text.match(/\b(january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sep|oct|nov|dec)\s+(\d{1,2})(?:st|nd|rd|th)?\b/i) ||
+                    text.match(/\b(\d{1,2})(?:st|nd|rd|th)?\s+(january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sep|oct|nov|dec)\b/i);
+
+  if(dateMatch) {
+    let mStr, day;
+    if(isNaN(dateMatch[1])) { mStr=dateMatch[1].toLowerCase(); day=parseInt(dateMatch[2]); }
+    else                    { day=parseInt(dateMatch[1]); mStr=dateMatch[2].toLowerCase(); }
+    const mIdx = months[mStr];
+    if(mIdx !== undefined && day >= 1 && day <= 31) {
+      eventDate = new Date(today.getFullYear(), mIdx, day);
+      if(eventDate < today) eventDate.setFullYear(today.getFullYear()+1);
+    }
+  }
+
+  // "tomorrow" / "next [weekday]"
+  if(!eventDate && lower.includes('tomorrow')) {
+    eventDate = new Date(today); eventDate.setDate(today.getDate()+1);
+  }
+  if(!eventDate && lower.includes('next week')) {
+    eventDate = new Date(today); eventDate.setDate(today.getDate()+7);
+  }
+
+  if(!eventDate) return null;
+
+  // Extract time
+  const timeMatch = text.match(/\b(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b/i) ||
+                    text.match(/\bat\s+(\d{1,2})(?::(\d{2}))?\b/i);
+  let time = null;
+  if(timeMatch) {
+    const h = timeMatch[1], m = timeMatch[2]||'00', ampm = timeMatch[3]||'';
+    time = `${h}:${m}${ampm ? ' '+ampm.toUpperCase() : ''}`;
+  }
+
+  // Extract title — look for quoted text or "meeting/call/session/interview" etc.
+  const quotedMatch  = text.match(/"([^"]+)"/);
+  const eventKeyword = text.match(/\b(meeting|call|session|interview|appointment|standup|review|demo|lunch|dinner|coffee|sync|workshop|webinar|presentation|consultation)\b/i);
+  const title = quotedMatch ? quotedMatch[1]
+              : eventKeyword ? eventKeyword[0].charAt(0).toUpperCase() + eventKeyword[0].slice(1)
+              : 'Scheduled Event';
+
+  return { title, date: eventDate, time, description: text };
+}
+
+/* ═══════════════════════════════════
+   VAPI
+═══════════════════════════════════ */
+async function loadVapi() {
+  try {
+    const mod = await import("./vapi-bundle.js");
+    VapiClass = mod.default ?? mod.Vapi ?? mod.VapiSDK;
+    if(typeof VapiClass !== "function" && VapiClass?.default) VapiClass = VapiClass.default;
+  } catch(e){ console.warn("[Vapi] bundle missing"); }
+}
+await loadVapi();
+
+function wireVapi() {
+  vapi.on("call-start", ()=>{ goActive(); showToast("✓ Connected"); });
+  vapi.on("call-end",   ()=>{ showToast("Call ended"); });
+  vapi.on("speech-start", ()=>showTyping(true));
+  vapi.on("speech-end",   ()=>showTyping(false));
+  vapi.on("message", msg=>{
+    if(msg.type==="transcript" && msg.transcriptType==="final"){
+      showTyping(false);
+      addMsg(msg.role==="user"?"user":"ai", msg.transcript);
+      // Check if AI just scheduled something
+      if(msg.role==="assistant"){
+        const ev = parseScheduleFromText(msg.transcript);
+        if(ev) {
+          setTimeout(()=>{
+            showToast(`✅ "${ev.title}" scheduled!`, 3000);
+            setTimeout(()=>goCalendar(ev), 1800);
+          }, 600);
         }
-      } catch {
-        backendDot.className     = "backend-dot fail";
-        backendLabel.textContent = "backend offline";
       }
     }
-    pingBackend();
-    setInterval(pingBackend, 15000);
+  });
+  vapi.on("error", err=>{
+    showToast("⚠ "+(err?.message||"Error"),5000);
+    goIdle(); vapi=null;
+  });
+}
 
-    // ─── VAPI EVENT WIRING ────────────────────────────────────────────────────
-    function wireEvents() {
-      vapi.on("call-start", () => {
-        setStatus("Call connected", "active");
-        setActive(true);
-        startBtn.disabled = true;
-        stopBtn.disabled  = false;
-        muteBtn.disabled  = false;
-        startTimer();
-        showToast("✓ Call started");
-      });
+async function startCall() {
+  if(!VapiClass){ showToast("⚠ vapi-bundle.js missing"); return; }
+  if(vapi) return;
+  try {
+    vapi = new VapiClass(PUBLIC_KEY); wireVapi();
+    await vapi.start(ASSISTANT_ID);
+  } catch(e){ showToast("⚠ "+(e.message||"Could not start")); vapi=null; }
+}
 
-      vapi.on("call-end", () => {
-        setStatus("Ready to connect");
-        setActive(false);
-        startBtn.disabled = false;
-        stopBtn.disabled  = true;
-        muteBtn.disabled  = true;
-        isMuted           = false;
-        muteBtn.textContent = "Mute";
-        muteBtn.classList.remove("muted");
-        vapi = null;
-        stopTimer();
-        showToast("Call ended");
-      });
+/* ═══════════════════════════════════
+   DEMO: trigger calendar state from text
+   Type something like "schedule a meeting on March 15 at 2pm"
+═══════════════════════════════════ */
+function handleTextInput(text) {
+  addMsg("user", text);
+  // Check if user typed a scheduling request — simulate AI response
+  const lower = text.toLowerCase();
+  const isScheduleRequest = lower.match(/schedule|book|set up|meeting|appointment|call|remind/);
+  if(isScheduleRequest) {
+    showTyping(true);
+    setTimeout(async ()=>{
+      // Simulate AI confirming
+      const ev = parseScheduleFromText(text);
+      const aiResponse = ev
+        ? `I've scheduled "${ev.title}" for ${ev.date.toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'})}${ev.time?' at '+ev.time:''}. I've added it to your calendar!`
+        : `I've noted that down! Could you give me the date and time for this event?`;
+      showTyping(false);
+      await typeWrite(aiResponse);
+      if(ev) {
+        setTimeout(()=>{
+          showToast(`✅ "${ev.title}" scheduled!`, 3000);
+          setTimeout(()=>goCalendar(ev), 1600);
+        }, 800);
+      }
+    }, 1200);
+  } else {
+    showTyping(true);
+    setTimeout(async ()=>{
+      showTyping(false);
+      await typeWrite("Sure! Tell me what you'd like to schedule — the event name, date, and time, and I'll get it set up for you.");
+    }, 1000);
+  }
+}
 
-      vapi.on("speech-start", () => setStatus("AI is speaking...", "active"));
-      vapi.on("speech-end",   () => setStatus("Listening...", "active"));
+/* ═══════════════════════════════════
+   EVENTS
+═══════════════════════════════════ */
+callBtn.addEventListener("click", async()=>{
+  await doGreet();
+  startCall();
+});
 
-      vapi.on("message", (msg) => {
-        console.log("[Vapi message]", msg);
-
-        // Show transcript
-        if (msg.type === "transcript" && msg.transcriptType === "final") {
-          appendTranscript(msg.role, msg.transcript);
-        }
-
-        // Tool call result — show in transcript so user knows meeting was booked
-        if (msg.type === "tool-calls") {
-          console.log("[Vapi] tool-calls received:", msg);
-        }
-      });
-
-      vapi.on("error", (err) => {
-        console.error("[Vapi error]", err);
-        setStatus("Error — check console", "error");
-        orb.classList.add("error");
-        showToast("⚠ " + (err?.message || "Vapi error"), 5000);
-        startBtn.disabled = false;
-        stopBtn.disabled  = true;
-        muteBtn.disabled  = true;
-        vapi = null;
-        stopTimer();
-      });
+idleInput.addEventListener("keydown", async e=>{
+  if(e.key==="Enter" && idleInput.value.trim()){
+    const v = idleInput.value.trim(); idleInput.value="";
+    if(!greeted){
+      greeted=true; goActive();
+      showTyping(true);
+      await new Promise(r=>setTimeout(r,900));
+      showTyping(false);
+      await typeWrite("Hey there! I'm SAMAY, your AI scheduling assistant. How can I help you today?");
     }
+    handleTextInput(v);
+  }
+});
 
-    // ─── LOAD SDK ─────────────────────────────────────────────────────────────
-    async function loadVapi() {
-      try {
-        const mod = await import("./vapi-bundle.js");
-        VapiClass = mod.default ?? mod.Vapi ?? mod.VapiSDK;
-        if (typeof VapiClass !== "function" && VapiClass?.default) {
-          VapiClass = VapiClass.default;
-        }
-        console.log("[Vapi] ✓ Loaded:", VapiClass?.name);
-        setStatus("Ready to connect");
-      } catch (e) {
-        console.warn("[Vapi] vapi-bundle.js not found:", e.message);
-        setStatus("Run esbuild command first", "error");
-        showToast("⚠ Run: npx esbuild node_modules/@vapi-ai/web/dist/vapi.js --bundle --format=esm --outfile=vapi-bundle.js --platform=browser");
-        transcriptEl.innerHTML = `
-          <p style="color:#ff4a6e;font-size:11px;line-height:1.8">
-            <b>⚠ One-time setup required:</b><br>Run this in your terminal:<br><br>
-            <code style="background:#1a2030;padding:6px 10px;border-radius:6px;display:block;margin-top:4px;color:#00e5a0;font-size:10px">
-              npx esbuild node_modules/@vapi-ai/web/dist/vapi.js --bundle --format=esm --outfile=vapi-bundle.js --platform=browser
-            </code><br>Then refresh this page.
-          </p>`;
-        transcriptEmpty = false;
-      }
+activeInput.addEventListener("keydown", e=>{
+  if(e.key==="Enter" && activeInput.value.trim()){
+    const v = activeInput.value.trim(); activeInput.value="";
+    if(vapi?.send) {
+      addMsg("user", v);
+      vapi.send({type:"add-message", message:{role:"user", content:v}});
+    } else {
+      handleTextInput(v);
     }
+  }
+});
 
-    await loadVapi();
+hangupBtn.addEventListener("click", ()=>{
+  if(vapi) vapi.stop();
+  goIdle();
+});
 
-    // ─── BUTTON HANDLERS ──────────────────────────────────────────────────────
-    startBtn.addEventListener("click", async () => {
-      if (vapi) return;
-      if (!VapiClass) {
-        showToast("⚠ Run the esbuild command first, then refresh");
-        return;
-      }
-      try {
-        setStatus("Connecting...", "active");
-        startBtn.disabled = true;
-        orb.classList.remove("error");
-        vapi = new VapiClass(PUBLIC_KEY);
-        wireEvents();
-        await vapi.start(ASSISTANT_ID);
-      } catch (e) {
-        console.error("[Vapi] start error:", e);
-        setStatus("Failed to start", "error");
-        showToast("⚠ " + (e.message || "Could not start call"));
-        startBtn.disabled = false;
-        vapi = null;
-      }
-    });
-
-    stopBtn.addEventListener("click", () => {
-      if (vapi) vapi.stop();
-    });
-
-    muteBtn.addEventListener("click", () => {
-      if (!vapi) return;
-      isMuted = !isMuted;
-      vapi.setMuted(isMuted);
-      muteBtn.classList.toggle("muted", isMuted);
-      muteBtn.querySelector("svg").style.opacity = isMuted ? "0.4" : "1";
-      muteBtn.childNodes[muteBtn.childNodes.length - 1].textContent = isMuted ? " Muted" : " Mute";
-    });
-  </script>
+// Init calendar on load
+renderCalendar();
+</script>
 </body>
 </html>
