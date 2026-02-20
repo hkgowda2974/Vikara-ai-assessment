@@ -896,17 +896,8 @@ function wireVapi(){
         if(/MEETING.?CONFIRMED|meeting confirmed|booking confirmed|schedule confirmed/i.test(text)){
           console.log('[VAPI] ✅ MEETING_CONFIRMED detected in:', text);
 
-          // ── Extract real Google Calendar event link from agent's speech ──
-          // Agent reads the direct event URL — grab it so "Open" goes to the actual event
-          // URLs in speech get transcribed with spaces, so we also check the full conversation
-          let gcalLink = null;
-
-          // Try to find a real https URL in the transcript
-          const urlMatch = text.match(/https?:\/\/\S+/i);
-          if(urlMatch) gcalLink = urlMatch[0];
-
-          // Also check if pendingEvent has a link (from tool-call result)
-          if(!gcalLink && pendingEvent?.gcalLink) gcalLink = pendingEvent.gcalLink;
+          // gcalLink comes from tool-call result only (agent does not speak the URL)
+          let gcalLink = pendingEvent?.gcalLink || null;
 
           // ── Extract date from agent's final readback ──
           // Agent says "Date, two zero two six zero two two six" → transcribed as "20260226"
