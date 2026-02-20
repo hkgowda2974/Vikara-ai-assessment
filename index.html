@@ -893,7 +893,7 @@ function wireVapi(){
         // ── TRIGGER: agent says "MEETING_CONFIRMED" keyword ──
         // Add to Vapi system prompt:
         // "After calling schedule_meeting and confirming the booking, always say the exact word MEETING_CONFIRMED at the end."
-        if(/MEETING_CONFIRMED/i.test(text)){
+        if(/MEETING.?CONFIRMED|meeting confirmed|booking confirmed|schedule confirmed/i.test(text)){
           console.log('[VAPI] ✅ MEETING_CONFIRMED keyword detected');
 
           // Pull stored event data that the tool call populated
