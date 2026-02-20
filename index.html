@@ -716,19 +716,19 @@ function renderEvents(){
 ════════════════════ */
 window.openGoogleCalendar = function(){
   if(!scheduledEvent) return;
-  if(scheduledEvent.gcalLink){ window.open(scheduledEvent.gcalLink,'_blank'); return; }
-  const ev=scheduledEvent, d=ev.date;
-  const pad = n => String(n).padStart(2,'0');
-  const ds  = `${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}`;
-  let h=10, m=0;
-  if(ev.time){
-    const x = ev.time.match(/(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/i);
-    if(x){ h=parseInt(x[1]); m=parseInt(x[2]||0);
-      const ap=(x[3]||'').toLowerCase();
-      if(ap==='pm'&&h<12) h+=12; if(ap==='am'&&h===12) h=0; }
+
+  // If we have the actual event link from backend — go straight to it
+  if(scheduledEvent.gcalLink){
+    window.open(scheduledEvent.gcalLink, '_blank');
+    return;
   }
-  const s=`${ds}T${pad(h)}${pad(m)}00`, e=`${ds}T${pad((h+1)%24)}${pad(m)}00`;
-  window.open(`https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(ev.title)}&dates=${s}/${e}&details=${encodeURIComponent('Scheduled via SAMAY')}`,'_blank');
+
+  // Otherwise build a view URL for the correct date (not create-event)
+  const ev = scheduledEvent, d = ev.date;
+  const pad = n => String(n).padStart(2,'0');
+  // Build day view URL: shows the specific day with the event visible
+  const dateStr = `${d.getFullYear()}/${pad(d.getMonth()+1)}/${pad(d.getDate())}`;
+  window.open(`https://calendar.google.com/calendar/r/day/${dateStr}`, '_blank');
 };
 
 /* ════════════════════
@@ -894,15 +894,56 @@ function wireVapi(){
         // Add to Vapi system prompt:
         // "After calling schedule_meeting and confirming the booking, always say the exact word MEETING_CONFIRMED at the end."
         if(/MEETING.?CONFIRMED|meeting confirmed|booking confirmed|schedule confirmed/i.test(text)){
-          console.log('[VAPI] ✅ MEETING_CONFIRMED keyword detected');
+          console.log('[VAPI] ✅ MEETING_CONFIRMED detected in:', text);
 
-          // Pull stored event data that the tool call populated
-          const ev = pendingEvent || {
-            title: lastMeetingTitle || 'Meeting',
-            date:  lastMeetingDate  || new Date(Date.now() + 86400000),
-            time:  lastMeetingTime  || null,
-            gcalLink: null
-          };
+          // ── Extract real Google Calendar event link from agent's speech ──
+          // Agent reads the direct event URL — grab it so "Open" goes to the actual event
+          // URLs in speech get transcribed with spaces, so we also check the full conversation
+          let gcalLink = null;
+
+          // Try to find a real https URL in the transcript
+          const urlMatch = text.match(/https?:\/\/\S+/i);
+          if(urlMatch) gcalLink = urlMatch[0];
+
+          // Also check if pendingEvent has a link (from tool-call result)
+          if(!gcalLink && pendingEvent?.gcalLink) gcalLink = pendingEvent.gcalLink;
+
+          // ── Extract date from agent's final readback ──
+          // Agent says "Date, two zero two six zero two two six" → transcribed as "20260226"
+          let eventDate = null;
+
+          // Match YYYYMMDD compact
+          const compact = text.match(/(202\d)(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])/);
+          // Match YYYY-MM-DD
+          const dashed  = text.match(/(202\d)-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])/);
+          // Match YYYY MM DD with spaces
+          const spaced  = text.match(/(202\d)\s+(0[1-9]|1[0-2])\s+(0[1-9]|[12]\d|3[01])/);
+
+          const dm = compact || dashed || spaced;
+          if(dm){
+            eventDate = new Date(dm[1] + '-' + dm[2] + '-' + dm[3] + 'T00:00:00');
+            if(isNaN(eventDate)) eventDate = null;
+            console.log('[VAPI] Date from transcript:', dm[0], '→', eventDate);
+          }
+
+          // Fallback: use pendingEvent date (from tool call — most accurate)
+          if(!eventDate && pendingEvent?.date) eventDate = pendingEvent.date;
+          // Last fallback: parse from what user said
+          if(!eventDate && lastUserUtterance) eventDate = parseDateFromText(lastUserUtterance);
+          if(!eventDate) eventDate = new Date(Date.now() + 86400000);
+
+          // ── Extract time from agent's readback ──
+          // e.g. "Time, nine PM ST" or "9 AM IST"
+          const timeMatch = text.match(/(\d{1,2})(?::(\d{2}))?\s*(AM|PM)/i);
+          const time = timeMatch ? timeMatch[0] : (pendingEvent?.time || null);
+
+          // ── Title: from pendingEvent (tool call args) or user's last utterance ──
+          const title = pendingEvent?.title ||
+            (lastUserUtterance && lastUserUtterance.length > 1 && lastUserUtterance.length < 60
+              ? lastUserUtterance.charAt(0).toUpperCase() + lastUserUtterance.slice(1)
+              : 'Meeting');
+
+          const ev = { title, date: eventDate, time, gcalLink };
           console.log('[VAPI] → goCalendar:', ev);
           showToast('✅ Meeting scheduled!', 2000);
           setTimeout(()=> goCalendar(ev), 500);
