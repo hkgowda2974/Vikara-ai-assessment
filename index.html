@@ -444,6 +444,9 @@ let lastMeetingTitle   = '';   // populated when tool fires
 let lastMeetingDate    = null; // populated when tool fires
 let lastMeetingTime    = null; // populated when tool fires
 let pendingEvent       = null; // full event object ready to show
+let assistantBuffer    = '';   // accumulates assistant speech across chunks
+let allUserSpeech      = '';   // all user speech concatenated
+let allMeetingTitle    = '';   // title captured from tool call args
 
 /* ════════════════════
    ELEMENTS
@@ -801,6 +804,9 @@ function loadVapi(){
 function wireVapi(){
   vapi.on("call-start", ()=> {
     console.log('[VAPI EVENT] call-start');
+    assistantBuffer = '';
+    allUserSpeech   = '';
+    allMeetingTitle = '';
     goActive();
   });
 
@@ -850,6 +856,7 @@ function wireVapi(){
           lastMeetingTitle = pendingEvent.title;
           lastMeetingDate  = pendingEvent.date;
           lastMeetingTime  = pendingEvent.time;
+          allMeetingTitle  = pendingEvent.title;
           console.log('[VAPI TOOL] pendingEvent stored:', pendingEvent);
         }
       });
@@ -881,64 +888,65 @@ function wireVapi(){
     if(msg.type === "transcript" && msg.transcriptType === "final"){
       showTyping(false);
       addMsg(msg.role === "user" ? "user" : "ai", msg.transcript);
-      // Track user's speech for reference only — no date parsing triggered here
       if(msg.role === "user"){
         lastUserUtterance = msg.transcript;
+        allUserSpeech += ' ' + msg.transcript;
         console.log('[VAPI] User said:', msg.transcript);
       }
       if(msg.role === "assistant"){
         const text = msg.transcript;
         console.log('[VAPI] Assistant said:', text);
 
-        // ── TRIGGER: agent says "MEETING_CONFIRMED" keyword ──
-        // Add to Vapi system prompt:
-        // "After calling schedule_meeting and confirming the booking, always say the exact word MEETING_CONFIRMED at the end."
+        // Accumulate all assistant speech — date is often split across chunks
+        assistantBuffer += ' ' + text;
+
         if(/MEETING.?CONFIRMED|meeting confirmed|booking confirmed|schedule confirmed/i.test(text)){
-          console.log('[VAPI] ✅ MEETING_CONFIRMED detected in:', text);
+          console.log('[VAPI] ✅ MEETING_CONFIRMED — full buffer:', assistantBuffer);
 
-          // gcalLink comes from tool-call result only (agent does not speak the URL)
-          let gcalLink = pendingEvent?.gcalLink || null;
+          // gcalLink from tool-call result only
+          const gcalLink = pendingEvent?.gcalLink || null;
 
-          // ── Extract date from agent's final readback ──
-          // Agent says "Date, two zero two six zero two two six" → transcribed as "20260226"
+          // ── Parse date from the FULL accumulated buffer ──
+          // Agent reads "two zero two six zero two two eight" across multiple chunks
+          // which concatenates to "20260228" in the buffer
           let eventDate = null;
 
-          // Match YYYYMMDD compact
-          const compact = text.match(/(202\d)(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])/);
-          // Match YYYY-MM-DD
-          const dashed  = text.match(/(202\d)-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])/);
-          // Match YYYY MM DD with spaces
-          const spaced  = text.match(/(202\d)\s+(0[1-9]|1[0-2])\s+(0[1-9]|[12]\d|3[01])/);
-
+          const compact = assistantBuffer.match(/(202\d)(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])/);
+          const dashed  = assistantBuffer.match(/(202\d)-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])/);
+          const spaced  = assistantBuffer.match(/(202\d)\s+(0[1-9]|1[0-2])\s+(0[1-9]|[12]\d|3[01])/);
           const dm = compact || dashed || spaced;
+
           if(dm){
             eventDate = new Date(dm[1] + '-' + dm[2] + '-' + dm[3] + 'T00:00:00');
             if(isNaN(eventDate)) eventDate = null;
-            console.log('[VAPI] Date from transcript:', dm[0], '→', eventDate);
+            console.log('[VAPI] Date from buffer:', dm[0], '→', eventDate);
           }
 
-          // Fallback: use pendingEvent date (from tool call — most accurate)
+          // Fallback to tool-call date (most accurate source)
           if(!eventDate && pendingEvent?.date) eventDate = pendingEvent.date;
-          // Last fallback: parse from what user said
-          if(!eventDate && lastUserUtterance) eventDate = parseDateFromText(lastUserUtterance);
+          // Fallback to user speech
+          if(!eventDate) eventDate = parseDateFromText(allUserSpeech);
           if(!eventDate) eventDate = new Date(Date.now() + 86400000);
 
-          // ── Extract time from agent's readback ──
-          // e.g. "Time, nine PM ST" or "9 AM IST"
-          const timeMatch = text.match(/(\d{1,2})(?::(\d{2}))?\s*(AM|PM)/i);
-          const time = timeMatch ? timeMatch[0] : (pendingEvent?.time || null);
+          // ── Time from buffer ──
+          const timeMatch = assistantBuffer.match(/time[,\s]+(\d{1,2})(?::(\d{2}))?\s*(AM|PM)/i)
+                         || assistantBuffer.match(/(\d{1,2})(?::(\d{2}))?\s*(AM|PM)/i);
+          const time = timeMatch ? (timeMatch[1] + (timeMatch[2] ? ':'+timeMatch[2] : ':00') + ' ' + timeMatch[3].toUpperCase())
+                                 : (pendingEvent?.time || null);
 
-          // ── Title: from pendingEvent (tool call args) or user's last utterance ──
-          const title = pendingEvent?.title ||
-            (lastUserUtterance && lastUserUtterance.length > 1 && lastUserUtterance.length < 60
-              ? lastUserUtterance.charAt(0).toUpperCase() + lastUserUtterance.slice(1)
-              : 'Meeting');
+          // ── Title from tool-call args (NOT from lastUserUtterance which can be a stray word) ──
+          const title = (pendingEvent?.title && pendingEvent.title !== 'Meeting')
+            ? pendingEvent.title
+            : (allMeetingTitle || 'Meeting');
 
           const ev = { title, date: eventDate, time, gcalLink };
           console.log('[VAPI] → goCalendar:', ev);
           showToast('✅ Meeting scheduled!', 2000);
           setTimeout(()=> goCalendar(ev), 500);
-          pendingEvent = null;
+          // Reset buffers
+          pendingEvent    = null;
+          assistantBuffer = '';
+          allMeetingTitle = '';
         }
       }
     }
