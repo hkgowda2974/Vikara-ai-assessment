@@ -763,6 +763,23 @@ function handleTextInput(text){
 }
 
 /* ════════════════════
+   SIMPLE DATE EXTRACTOR (for user speech)
+════════════════════ */
+function parseDateFromText(text){
+  const months = {jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11,
+    january:0,february:1,march:2,april:3,june:5,july:6,august:7,september:8,october:9,november:10,december:11};
+  const today = new Date();
+  const lower = text.toLowerCase();
+  let d = null;
+  const dm = text.match(/\b(january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sep|oct|nov|dec)\s+(\d{1,2})(?:st|nd|rd|th)?\b/i);
+  if(dm){ const mIdx=months[dm[1].toLowerCase()],day=parseInt(dm[2]); if(mIdx!==undefined){ d=new Date(today.getFullYear(),mIdx,day); if(d<today)d.setFullYear(today.getFullYear()+1); } }
+  if(!d&&lower.includes('tomorrow')){ d=new Date(today); d.setDate(today.getDate()+1); }
+  if(!d&&lower.includes('next week')){ d=new Date(today); d.setDate(today.getDate()+7); }
+  if(!d&&lower.includes('today')){ d=new Date(today); }
+  return d;
+}
+
+/* ════════════════════
    VAPI — loaded async,
    does NOT block listeners
 ════════════════════ */
@@ -866,8 +883,61 @@ function wireVapi(){
       }
       if(msg.role === "assistant"){
         console.log('[VAPI] Assistant said:', msg.transcript);
-        // DO NOT parse dates from assistant messages — it causes false triggers
-        // The tool call (schedule_meeting) is the only calendar trigger
+
+        // Detect scheduling confirmation from assistant's speech
+        // Strategy 1: Google Calendar link in the transcript
+        const gcalMatch = msg.transcript.match(/https?:\/\/[^\s]+google[^\s]+calendar[^\s]*/i) ||
+                          msg.transcript.match(/calendar\.google\.com[^\s]*/i);
+
+        // Strategy 2: Agent speaks out a date in YYYY-MM-DD format (e.g. "2026-02-26")
+        const dateMatch = msg.transcript.match(/\b(202\d)[\s\-](0[1-9]|1[0-2])[\s\-](0[1-9]|[12]\d|3[01])\b/) ||
+                          msg.transcript.match(/\b(202\d)(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])\b/);
+
+        // Strategy 3: Strong confirmation phrase + we have a user utterance with date info
+        const confirmPhrases = ['successfully scheduled','has been scheduled','been booked',
+                                'meeting is confirmed','your meeting','here are the details',
+                                'calendar link','view or manage'];
+        const hasConfirm = confirmPhrases.some(p => msg.transcript.toLowerCase().includes(p));
+
+        if(gcalMatch || dateMatch || hasConfirm){
+          console.log('[VAPI] Confirmation detected! gcal:', gcalMatch, 'date:', dateMatch, 'confirm:', hasConfirm);
+
+          // Build event from what we can extract
+          let eventDate = null;
+          let gcalLink  = null;
+
+          // Extract Google Calendar link
+          if(gcalMatch){
+            gcalLink = gcalMatch[0].startsWith('http') ? gcalMatch[0] : 'https://' + gcalMatch[0];
+          }
+
+          // Extract date from spoken YYYY-MM-DD or YYYYMMDD
+          if(dateMatch){
+            const y = dateMatch[1], m = dateMatch[2], d = dateMatch[3];
+            eventDate = new Date(`${y}-${m}-${d}T00:00:00`);
+          }
+
+          // Fallback: parse from user's last speech
+          if(!eventDate && lastUserUtterance){
+            eventDate = parseDateFromText(lastUserUtterance);
+          }
+
+          if(!eventDate) eventDate = new Date(Date.now() + 86400000);
+
+          // Extract time from assistant speech (e.g. "nine AM IST", "3:30 PM")
+          const timeMatch = msg.transcript.match(/\b(\d{1,2})(?::(\d{2}))?\s*(AM|PM|IST|am|pm)/i);
+          let time = null;
+          if(timeMatch) time = timeMatch[0];
+
+          // Extract title from user's last utterance (likely the meeting title they said)
+          const kw = lastUserUtterance.match(/\b(meeting|call|session|interview|appointment|standup|review|demo|lunch|dinner|coffee|sync|workshop|presentation)\b/i);
+          const title = kw ? kw[0].charAt(0).toUpperCase()+kw[0].slice(1) : (lastUserUtterance.length > 2 && lastUserUtterance.length < 40 ? lastUserUtterance : 'Meeting');
+
+          const ev = { title, date: eventDate, time, gcalLink };
+          console.log('[VAPI] → goCalendar:', ev);
+          showToast('✅ Meeting scheduled!', 2500);
+          setTimeout(()=> goCalendar(ev), 600);
+        }
       }
     }
   });
