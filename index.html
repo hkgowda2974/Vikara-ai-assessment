@@ -210,7 +210,6 @@ body::after {
   border-radius:22px; overflow:hidden;
   box-shadow:0 12px 56px rgba(45,90,39,0.16),0 2px 10px rgba(0,0,0,0.08);
 }
-/* Removed @keyframes calIn — it was causing the card to be invisible on re-entry */
 
 .cal-left {
   width:40%; flex-shrink:0;
@@ -284,6 +283,28 @@ body::after {
 .badge-done   { background:rgba(0,0,0,0.05); color:#bbb; }
 .badge-future { background:rgba(212,252,121,0.30); color:#4a7a1a; }
 .ev-divider { height:1px; background:rgba(0,0,0,0.05); margin:0 16px; }
+
+/* ══ DEBUG OVERLAY ══ */
+.debug-overlay {
+  position:fixed; top:12px; right:12px; z-index:99999;
+  background:rgba(0,0,0,0.82); backdrop-filter:blur(10px);
+  color:#D4FC79; font-family:monospace; font-size:11px; line-height:1.7;
+  padding:12px 16px; border-radius:14px; max-width:300px;
+  border:1px solid rgba(212,252,121,0.25);
+  opacity:0; transition:opacity .3s; pointer-events:none;
+}
+.debug-overlay.show { opacity:1; }
+.debug-overlay .db-head { color:#fff; font-weight:700; font-size:12px; margin-bottom:6px; letter-spacing:.3px; font-family:'DM Sans',sans-serif; }
+.debug-overlay .db-row  { display:flex; gap:8px; margin-bottom:1px; }
+.debug-overlay .db-key  { color:#888; min-width:52px; flex-shrink:0; }
+.debug-overlay .db-val  { color:#D4FC79; word-break:break-all; }
+.debug-overlay .db-ok   { color:#7adc5e; }
+.debug-overlay .db-warn { color:#ffb347; }
+.debug-overlay .db-close { 
+  position:absolute; top:8px; right:10px; cursor:pointer; color:#555; 
+  font-size:14px; pointer-events:all; line-height:1;
+}
+.debug-overlay .db-close:hover { color:#fff; }
 
 /* ══ TOAST ══ */
 .toast {
@@ -421,6 +442,16 @@ body::after {
   </div>
 </div>
 
+<div class="debug-overlay" id="debugOverlay">
+  <div class="db-close" onclick="document.getElementById('debugOverlay').classList.remove('show')">✕</div>
+  <div class="db-head">🛠 Event Debug</div>
+  <div class="db-row"><span class="db-key">title</span><span class="db-val" id="db-title">—</span></div>
+  <div class="db-row"><span class="db-key">date</span><span class="db-val" id="db-date">—</span></div>
+  <div class="db-row"><span class="db-key">time</span><span class="db-val" id="db-time">—</span></div>
+  <div class="db-row"><span class="db-key">source</span><span class="db-val" id="db-source">—</span></div>
+  <div class="db-row"><span class="db-key">gcalURL</span><span class="db-val" id="db-url">—</span></div>
+  <div class="db-row"><span class="db-key">account</span><span class="db-val" id="db-account">—</span></div>
+</div>
 <div class="toast" id="toast"></div>
 
 <script>
@@ -429,6 +460,13 @@ body::after {
 ════════════════════ */
 const ASSISTANT_ID = "f08de70a-4804-440d-89b1-5c6463f00a65";
 const PUBLIC_KEY   = "1135bec2-5e08-4bdb-854e-1a311db0ff0b";
+
+// ── Set this to the Gmail address used in your calendar.py ──
+// NOTE: Google Calendar URL uses account INDEX (0, 1, 2...), not email address.
+// If 1mp22cs021@gmail.com is your PRIMARY Google account, use 0.
+// If it's your second account, use 1. Change this number to match.
+const CALENDAR_EMAIL = '1mp22cs021@gmail.com';
+const CALENDAR_ACCOUNT_INDEX = 0; // ← change to 1 if this is your 2nd Google account
 
 /* ════════════════════
    STATE
@@ -439,15 +477,15 @@ let appState = 'idle';
 let scheduledEvent = null;
 let calYear  = new Date().getFullYear();
 let calMonth = new Date().getMonth();
-let lastUserUtterance  = ''; // tracks what user said by voice
-let lastMeetingTitle   = '';   // populated when tool fires
-let lastMeetingDate    = null; // populated when tool fires
-let lastMeetingTime    = null; // populated when tool fires
-let pendingEvent       = null; // full event object ready to show
-let assistantBuffer    = '';   // accumulates assistant speech across chunks
-let allUserSpeech      = '';   // all user speech concatenated
-let userUtterances     = [];   // each user utterance stored separately
-let allMeetingTitle    = '';   // title captured from tool call args
+let lastUserUtterance  = '';
+let lastMeetingTitle   = '';
+let lastMeetingDate    = null;
+let lastMeetingTime    = null;
+let pendingEvent       = null;
+let assistantBuffer    = '';
+let allUserSpeech      = '';
+let userUtterances     = [];
+let allMeetingTitle    = '';
 
 /* ════════════════════
    ELEMENTS
@@ -511,13 +549,40 @@ function goIdle(){
   typing.classList.remove("show");
   activeInput.value = "";
 }
-function goCalendar(event){
+function showDebug(ev, source){
+  const pad = n => String(n).padStart(2,'0');
+  const d = ev.date;
+  const dateStr = d ? `${d.getFullYear()}/${pad(d.getMonth()+1)}/${pad(d.getDate())}` : '??';
+  const url = `https://calendar.google.com/calendar/u/${CALENDAR_ACCOUNT_INDEX}/r/day/${dateStr}`;
+
+  document.getElementById('db-title').textContent   = ev.title || '(empty)';
+  document.getElementById('db-title').className     = 'db-val ' + (ev.title && ev.title !== 'Meeting' ? 'db-ok' : 'db-warn');
+
+  document.getElementById('db-date').textContent    = d ? d.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric',year:'numeric'}) : '(none)';
+  document.getElementById('db-date').className      = 'db-val ' + (d ? 'db-ok' : 'db-warn');
+
+  document.getElementById('db-time').textContent    = ev.time || '(none / all day)';
+  document.getElementById('db-time').className      = 'db-val ' + (ev.time ? 'db-ok' : 'db-warn');
+
+  document.getElementById('db-source').textContent  = source || 'unknown';
+  document.getElementById('db-source').className    = 'db-val ' + (source === 'tool-call' ? 'db-ok' : 'db-warn');
+
+  document.getElementById('db-url').textContent     = url;
+  document.getElementById('db-account').textContent = `index ${CALENDAR_ACCOUNT_INDEX} (${CALENDAR_EMAIL})`;
+  document.getElementById('db-account').className   = 'db-val db-ok';
+
+  document.getElementById('debugOverlay').classList.add('show');
+  console.log('[DEBUG] title:', ev.title, '| date:', dateStr, '| time:', ev.time, '| source:', source, '| url:', url);
+}
+
+function goCalendar(event, source){
   console.log('[SAMAY] goCalendar called with:', event);
   scheduledEvent = event;
   calYear  = event.date.getFullYear();
   calMonth = event.date.getMonth();
   renderCalendar();
   renderEvents();
+  showDebug(event, source || 'unknown');
   setState('calendar');
 }
 
@@ -556,14 +621,21 @@ function typeWrite(text, speed=14){
 
 /* ════════════════════
    DATE PARSER
+   FIX: Compare dates at midnight to avoid "today" being pushed to next year
 ════════════════════ */
+function todayMidnight(){
+  const t = new Date();
+  t.setHours(0,0,0,0);
+  return t;
+}
+
 function parseScheduleFromUserInput(text){
   const months = {
     jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11,
     january:0,february:1,march:2,april:3,june:5,july:6,august:7,september:8,
     october:9,november:10,december:11
   };
-  const today = new Date();
+  const today = todayMidnight(); // FIX: use midnight so today is never "in the past"
   let eventDate = null;
 
   // Named month match
@@ -603,8 +675,6 @@ function parseScheduleFromUserInput(text){
 
 function parseScheduleFromAIResponse(aiText){
   const lower = aiText.toLowerCase();
-
-  // Broad confirmation detection — catches almost any scheduling confirmation
   const confirmWords = [
     'scheduled','booking','booked','set up','confirmed','added','created',
     "i've","i have","all set","you're set","you are set","got you","got it",
@@ -612,17 +682,10 @@ function parseScheduleFromAIResponse(aiText){
     'penciled','set for','down for','set on'
   ];
   const hasConfirmation = confirmWords.some(w => lower.includes(w));
-
-  // Try to parse a date from the AI response first
   let ev = parseScheduleFromUserInput(aiText);
-
-  // If no date in AI response, fall back to what the USER said
   if(!ev && lastUserUtterance) {
     ev = parseScheduleFromUserInput(lastUserUtterance);
   }
-
-  // Only return if we have EITHER a confirmation word OR a parseable date
-  // (voice agents sometimes confirm without repeating the date)
   if(!hasConfirmation && !ev) return null;
   return ev;
 }
@@ -672,7 +735,9 @@ function renderEvents(){
   if(!scheduledEvent){ evEmpty.style.display='flex'; return; }
   evEmpty.style.display = 'none';
   const ev = scheduledEvent;
-  const isFuture = ev.date >= new Date();
+  // FIX: compare dates at midnight so "today's" event shows as future
+  const evMidnight = new Date(ev.date); evMidnight.setHours(0,0,0,0);
+  const isFuture = evMidnight >= todayMidnight();
   const dateLabel = ev.date.toLocaleDateString('en-US',{month:'short',day:'numeric'});
 
   const row = document.createElement('div');
@@ -716,11 +781,10 @@ function renderEvents(){
 }
 
 /* ════════════════════
-   GOOGLE CALENDAR
+   GOOGLE CALENDAR LINK
+   FIX: Use account INDEX (/u/0/, /u/1/) not email in the URL.
+   Google ignores email addresses in that URL segment.
 ════════════════════ */
-// ── Set this to the Gmail address used in your calendar.py ──
-const CALENDAR_EMAIL = '1mp22cs021@gmail.com';
-
 window.openGoogleCalendar = function(){
   if(!scheduledEvent) return;
 
@@ -730,12 +794,14 @@ window.openGoogleCalendar = function(){
     return;
   }
 
-  // Build day-view URL forcing the correct Google account
+  // Build day-view URL with account index
   const ev = scheduledEvent, d = ev.date;
   const pad = n => String(n).padStart(2,'0');
   const dateStr = `${d.getFullYear()}/${pad(d.getMonth()+1)}/${pad(d.getDate())}`;
-  // /u/EMAIL/ forces Google Calendar to open as that specific account
-  window.open(`https://calendar.google.com/calendar/u/${CALENDAR_EMAIL}/r/day/${dateStr}`, '_blank');
+  // /u/0/ = primary account, /u/1/ = second account, etc.
+  const url = `https://calendar.google.com/calendar/u/${CALENDAR_ACCOUNT_INDEX}/r/day/${dateStr}`;
+  console.log('[SAMAY] Opening Google Calendar:', url, '(account index:', CALENDAR_ACCOUNT_INDEX, ')');
+  window.open(url, '_blank');
 };
 
 /* ════════════════════
@@ -757,10 +823,9 @@ function handleTextInput(text){
       await typeWrite(response);
 
       if(ev){
-        // Short delay then go to calendar — total ~1.5s after typewrite finishes
         setTimeout(()=>{
           showToast(`✅ "${ev.title}" scheduled!`, 2500);
-          setTimeout(()=> goCalendar(ev), 600);
+          setTimeout(()=> goCalendar(ev, 'text-input'), 600);
         }, 400);
       }
     }, 800);
@@ -782,7 +847,11 @@ function parseDateFromText(text){
     january:0,february:1,march:2,april:3,june:5,july:6,august:7,september:8,
     october:9,november:10,december:11
   };
-  // Convert any spoken number or ordinal to an integer
+  // FIX: use midnight for "today" comparisons
+  const today = todayMidnight();
+  const lower = text.toLowerCase();
+  let d = null;
+
   function spokenToNum(str) {
     if(!str) return NaN;
     str = str.toLowerCase().trim().replace(/[- ]+/g, ' ');
@@ -790,42 +859,26 @@ function parseDateFromText(text){
       zero:0,one:1,two:2,three:3,four:4,five:5,six:6,seven:7,eight:8,nine:9,
       ten:10,eleven:11,twelve:12,thirteen:13,fourteen:14,fifteen:15,sixteen:16,
       seventeen:17,eighteen:18,nineteen:19,
-      // ordinals
       first:1,second:2,third:3,fourth:4,fifth:5,sixth:6,seventh:7,eighth:8,
       ninth:9,tenth:10,eleventh:11,twelfth:12,thirteenth:13,fourteenth:14,
       fifteenth:15,sixteenth:16,seventeenth:17,eighteenth:18,nineteenth:19
     };
     const tens = {twenty:20,thirty:30,twentieth:20,thirtieth:30};
-
-    // Plain digit
     if(/^\d+$/.test(str)) return parseInt(str);
-
-    // Single word: "five", "eighth"
     if(ones[str] !== undefined) return ones[str];
     if(tens[str] !== undefined) return tens[str];
-
-    // Two words: "twenty one", "thirty second", "twenty eighth"
     const parts = str.split(' ');
     if(parts.length === 2){
       const t = tens[parts[0]];
       const o = ones[parts[1]];
       if(t !== undefined && o !== undefined) return t + o;
-      // e.g. "twenty first" → 21
-      const ordinalOnes = {first:1,second:2,third:3,fourth:4,fifth:5,sixth:6,
-        seventh:7,eighth:8,ninth:9};
+      const ordinalOnes = {first:1,second:2,third:3,fourth:4,fifth:5,sixth:6,seventh:7,eighth:8,ninth:9};
       if(t !== undefined && ordinalOnes[parts[1]] !== undefined) return t + ordinalOnes[parts[1]];
     }
     return NaN;
   }
 
-  const today = new Date();
-  const lower = text.toLowerCase();
-  let d = null;
-
-  // Pattern 1: "February twenty eighth" / "twenty eighth February" (spoken ordinals)
   const monthNames = 'january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sep|oct|nov|dec';
-  // Pattern 1: spoken ordinals/cardinals + month name in any order
-  // Matches: "twenty eighth february", "february twenty eight", "28th february", "march 5"
   const tensW   = 'twenty|thirty';
   const onesW   = 'one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen';
   const ordW    = 'first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth|eleventh|twelfth|thirteenth|fourteenth|fifteenth|sixteenth|seventeenth|eighteenth|nineteenth|twentieth|thirtieth';
@@ -845,14 +898,14 @@ function parseDateFromText(text){
   if(mStr && dayStr){
     const mIdx = months[mStr.toLowerCase().replace(/[.]/g,'')];
     let day = parseInt(dayStr.replace(/[a-z]+/gi,''));
-    if(isNaN(day)) day = spokenToNum(dayStr.replace(/(st|nd|rd|th)/gi,'').trim());
+    if(isNaN(day)) day = spokenToNum(dayStr.replace(/(st|nd|rd|th)/gi,'').trim());
     if(mIdx !== undefined && !isNaN(day) && day >= 1 && day <= 31){
       d = new Date(today.getFullYear(), mIdx, day);
+      // FIX: strictly less than (not <=) so today's date isn't pushed to next year
       if(d < today) d.setFullYear(today.getFullYear() + 1);
     }
   }
 
-  // Pattern 2: "28th February" / "February 28"
   if(!d){
     const dm = text.match(/\b(january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sep|oct|nov|dec)\s+(\d{1,2})(?:st|nd|rd|th)?\b/i)
             || text.match(/\b(\d{1,2})(?:st|nd|rd|th)?\s+(january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sep|oct|nov|dec)\b/i);
@@ -876,11 +929,9 @@ function parseDateFromText(text){
 }
 
 /* ════════════════════
-   VAPI — loaded async,
-   does NOT block listeners
+   VAPI
 ════════════════════ */
 function loadVapi(){
-  // Non-blocking — event listeners are already registered below
   import("./vapi-bundle.js").then(mod=>{
     VapiClass = mod.default ?? mod.Vapi ?? mod.VapiSDK;
     if(typeof VapiClass !== "function" && VapiClass?.default) VapiClass = VapiClass.default;
@@ -919,8 +970,7 @@ function wireVapi(){
   vapi.on("message", msg=>{
     console.log('[VAPI MESSAGE] type:', msg.type);
 
-    // ── 1. TOOL CALL — agent called schedule_meeting ──
-    // This is the ONLY reliable trigger: agent collected all info and called the tool
+    // ── 1. TOOL CALL ──
     if(msg.type === 'tool-calls' || msg.type === 'function-call'){
       const toolList = msg.toolCallList || (msg.functionCall ? [{ function: msg.functionCall }] : []);
       toolList.forEach(tool => {
@@ -930,13 +980,26 @@ function wireVapi(){
           let args = tool.function?.arguments || '{}';
           if(typeof args === 'string') { try { args = JSON.parse(args); } catch(e){ args = {}; } }
           console.log('[VAPI TOOL] schedule_meeting args:', args);
+
+          // FIX: parse date robustly — handle ISO strings AND plain date strings
           let eventDate = null;
           if(args.date){
-            eventDate = new Date(args.date + 'T00:00:00');
+            // Try ISO first (2025-02-26), then with time appended
+            const raw = args.date.trim();
+            // If it's already a full ISO datetime
+            if(/^\d{4}-\d{2}-\d{2}T/.test(raw)){
+              eventDate = new Date(raw);
+            } else if(/^\d{4}-\d{2}-\d{2}$/.test(raw)){
+              // Plain date — parse parts directly to avoid timezone shift
+              const [y,m,dy] = raw.split('-').map(Number);
+              eventDate = new Date(y, m-1, dy); // local time, no UTC shift
+            } else {
+              eventDate = new Date(raw);
+            }
             if(isNaN(eventDate.getTime())) eventDate = null;
           }
           if(!eventDate) eventDate = new Date(Date.now() + 86400000);
-          // Store as pendingEvent — calendar opens when MEETING_CONFIRMED keyword is spoken
+
           pendingEvent = {
             title: args.title || args.summary || args.eventName || args.meeting_title || 'Meeting',
             date:  eventDate,
@@ -948,34 +1011,45 @@ function wireVapi(){
           lastMeetingTime  = pendingEvent.time;
           allMeetingTitle  = pendingEvent.title;
           console.log('[VAPI TOOL] ⭐ pendingEvent stored:', JSON.stringify(pendingEvent));
-          console.log('[VAPI TOOL] ⭐ args were:', JSON.stringify(args));
         }
       });
       return;
     }
 
-    // ── 2. TOOL CALL RESULT — backend responded ──
+    // ── 2. TOOL CALL RESULT ──
     if(msg.type === 'tool-call-result' || msg.type === 'function-call-result'){
       console.log('[VAPI TOOL RESULT]', JSON.stringify(msg));
-      // If backend returns event data in result, use that
       try {
         const result = typeof msg.result === 'string' ? JSON.parse(msg.result) : msg.result;
         if(result && (result.date || result.eventDate || result.htmlLink)){
+          // FIX: same robust date parsing for tool results
+          let evDate = null;
+          const rawDate = result.date || result.eventDate;
+          if(rawDate){
+            if(/^\d{4}-\d{2}-\d{2}$/.test(rawDate.trim())){
+              const [y,m,dy] = rawDate.trim().split('-').map(Number);
+              evDate = new Date(y, m-1, dy);
+            } else {
+              evDate = new Date(rawDate);
+            }
+          }
+          if(!evDate || isNaN(evDate.getTime())) evDate = new Date(Date.now() + 86400000);
+
           const ev = {
             title:   result.title || result.summary || result.eventName || 'Meeting',
-            date:    result.date ? new Date(result.date) : new Date(Date.now() + 86400000),
+            date:    evDate,
             time:    result.time || result.startTime || null,
             gcalLink: result.htmlLink || result.link || null
           };
           console.log('[VAPI TOOL RESULT] → goCalendar:', ev);
           showToast('✅ Meeting scheduled!', 2500);
-          setTimeout(()=> goCalendar(ev), 800);
+          setTimeout(()=> goCalendar(ev, 'tool-result'), 800);
         }
       } catch(e) { console.log('[VAPI TOOL RESULT] parse error:', e); }
       return;
     }
 
-    // ── 3. TRANSCRIPT — show messages, but DO NOT parse dates here ──
+    // ── 3. TRANSCRIPT ──
     if(msg.type === "transcript" && msg.transcriptType === "final"){
       showTyping(false);
       addMsg(msg.role === "user" ? "user" : "ai", msg.transcript);
@@ -988,69 +1062,66 @@ function wireVapi(){
       if(msg.role === "assistant"){
         const text = msg.transcript;
         console.log('[VAPI] Assistant said:', text);
-
-        // Accumulate all assistant speech — date is often split across chunks
         assistantBuffer += ' ' + text;
 
-        if(/MEETING.?CONFIRMED|meeting confirmed|booking confirmed|schedule confirmed/i.test(text)){
-          console.log('[VAPI] ✅ MEETING_CONFIRMED — full buffer:', assistantBuffer);
+        // STRICT: only open calendar when assistant says the exact keyword MEETING_CONFIRMED
+        // Matches any casing and optional separator: meeting_confirmed, MEETING CONFIRMED, meetingConfirmed, etc.
+        const isConfirmed = /meeting[\s_-]?confirmed/i.test(text);
 
-          // gcalLink from tool-call result only
-          const gcalLink = pendingEvent?.gcalLink || null;
-
-          // ── SOURCE OF TRUTH: what the USER said ──
+        if(isConfirmed){
+          console.log('[VAPI] ✅ MEETING_CONFIRMED keyword detected in:', text);
+          console.log('[VAPI] pendingEvent:', JSON.stringify(pendingEvent));
           console.log('[VAPI] allUserSpeech:', allUserSpeech);
-          const speech = allUserSpeech.toLowerCase();
 
-          // ── DATE ──
-          let eventDate = parseDateFromText(allUserSpeech);
-          if(!eventDate) eventDate = new Date(Date.now() + 86400000);
-          console.log('[VAPI] Date from user speech:', eventDate);
+          let ev;
 
-          // ── TIME — handles "One PM", "10 AM", "Three thirty PM" ──
-          const timeNums = {one:1,two:2,three:3,four:4,five:5,six:6,seven:7,eight:8,nine:9,ten:10,eleven:11,twelve:12};
-          let time = null;
-
-          // Try digit first: "10 AM", "3:30 PM"
-          const dtm = speech.match(/(\d{1,2})(?::(\d{2}))?\s*(am|pm)/);
-          if(dtm){
-            time = dtm[1] + ':' + (dtm[2]||'00') + ' ' + dtm[3].toUpperCase();
+          if(pendingEvent){
+            // ── PREFERRED: use data from the tool call (most accurate) ──
+            ev = { ...pendingEvent };
           } else {
-            // Word time: "one pm", "ten am", "three thirty pm"
-            const wtm = speech.match(/(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)(\s+thirty)?\s*(am|pm)/);
-            if(wtm){
-              const h = timeNums[wtm[1]];
-              const m = wtm[2] ? '30' : '00';
-              time = h + ':' + m + ' ' + wtm[3].toUpperCase();
+            // ── FALLBACK: parse from user speech ──
+            const gcalLink = null;
+            let eventDate = parseDateFromText(allUserSpeech);
+            if(!eventDate) eventDate = new Date(Date.now() + 86400000);
+
+            const timeNums = {one:1,two:2,three:3,four:4,five:5,six:6,seven:7,eight:8,nine:9,ten:10,eleven:11,twelve:12};
+            let time = null;
+            const speech = allUserSpeech.toLowerCase();
+            const dtm = speech.match(/(\d{1,2})(?::(\d{2}))?\s*(am|pm)/);
+            if(dtm){
+              time = dtm[1] + ':' + (dtm[2]||'00') + ' ' + dtm[3].toUpperCase();
+            } else {
+              const wtm = speech.match(/(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)(\s+thirty)?\s*(am|pm)/);
+              if(wtm){
+                const h = timeNums[wtm[1]];
+                const m = wtm[2] ? '30' : '00';
+                time = h + ':' + m + ' ' + wtm[3].toUpperCase();
+              }
             }
-          }
-          console.log('[VAPI] Time from user speech:', time);
 
-          // ── TITLE — each user utterance is stored separately, find the title one ──
-          // userUtterances is an array of each thing the user said
-          const isDatePart = /(january|february|march|april|may|june|july|august|september|october|november|december|monday|tuesday|wednesday|thursday|friday|saturday|sunday|tomorrow|today|next|twenty|thirty|first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth|\d)/i;
-          const isTimePart = /(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|\d)\s*(am|pm|ist)/i;
-          const isFiller   = /^(yes|no|okay|ok|sure|thanks|thank|hello|hi|namaste|please|proceed|blank|leave|skip|none|no title|am|pm)$/i;
-          
-          let title = 'Meeting';
-          // Go through utterances newest-first, pick first that isn't date/time/filler
-          const uttList = userUtterances.slice().reverse();
-          for(const utt of uttList){
-            const u = utt.trim();
-            if(u.length < 2) continue;
-            if(isFiller.test(u)) continue;
-            if(isTimePart.test(u)) continue;
-            if(isDatePart.test(u)) continue;
-            title = u.charAt(0).toUpperCase() + u.slice(1);
-            break;
-          }
-          console.log('[VAPI] Title from user speech:', title);
+            const isDatePart = /(january|february|march|april|may|june|july|august|september|october|november|december|monday|tuesday|wednesday|thursday|friday|saturday|sunday|tomorrow|today|next|twenty|thirty|first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth|\d)/i;
+            const isTimePart = /(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|\d)\s*(am|pm|ist)/i;
+            const isFiller   = /^(yes|no|okay|ok|sure|thanks|thank|hello|hi|namaste|please|proceed|blank|leave|skip|none|no title|am|pm)$/i;
+            let title = 'Meeting';
+            const uttList = userUtterances.slice().reverse();
+            for(const utt of uttList){
+              const u = utt.trim();
+              if(u.length < 2) continue;
+              if(isFiller.test(u)) continue;
+              if(isTimePart.test(u)) continue;
+              if(isDatePart.test(u)) continue;
+              title = u.charAt(0).toUpperCase() + u.slice(1);
+              break;
+            }
 
-          const ev = { title, date: eventDate, time, gcalLink };
+            ev = { title, date: eventDate, time, gcalLink };
+          }
+
           console.log('[VAPI] → goCalendar:', ev);
           showToast('✅ Meeting scheduled!', 2000);
-          setTimeout(()=> goCalendar(ev), 500);
-          // Reset buffers
+          setTimeout(()=> goCalendar(ev, pendingEvent ? 'tool-call' : 'speech-parse'), 500);
+
+          // Reset
           pendingEvent    = null;
           assistantBuffer = '';
           allMeetingTitle = '';
@@ -1082,7 +1153,6 @@ async function startCall(){
 
 /* ════════════════════
    EVENT LISTENERS
-   (registered immediately — no blocking await)
 ════════════════════ */
 callBtn.addEventListener("click", startCall);
 
@@ -1122,7 +1192,7 @@ hangupBtn.addEventListener("click", ()=>{
    INIT
 ════════════════════ */
 renderCalendar();
-loadVapi(); // fire and forget — doesn't block anything
+loadVapi();
 </script>
 </body>
 </html>
