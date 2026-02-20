@@ -460,13 +460,7 @@ body::after {
 ════════════════════ */
 const ASSISTANT_ID = "f08de70a-4804-440d-89b1-5c6463f00a65";
 const PUBLIC_KEY   = "1135bec2-5e08-4bdb-854e-1a311db0ff0b";
-
-// ── Set this to the Gmail address used in your calendar.py ──
-// NOTE: Google Calendar URL uses account INDEX (0, 1, 2...), not email address.
-// If 1mp22cs021@gmail.com is your PRIMARY Google account, use 0.
-// If it's your second account, use 1. Change this number to match.
 const CALENDAR_EMAIL = '1mp22cs021@gmail.com';
-const CALENDAR_ACCOUNT_INDEX = null; // auto-detected at runtime
 
 /* ════════════════════
    STATE
@@ -620,8 +614,52 @@ function typeWrite(text, speed=14){
 }
 
 /* ════════════════════
-   DATE PARSER
-   FIX: Compare dates at midnight to avoid "today" being pushed to next year
+   SPOKEN NUMBER → INTEGER
+   FIXED: Complete ordinal map including sixth–ninth, twenty-sixth, etc.
+════════════════════ */
+function spokenToNum(str) {
+  if (!str) return NaN;
+  str = str.toLowerCase().trim().replace(/[- ]+/g, ' ').replace(/(st|nd|rd|th)$/, '').trim();
+
+  if (/^\d+$/.test(str)) return parseInt(str);
+
+  const ones = {
+    zero:0, one:1, two:2, three:3, four:4, five:5, six:6, seven:7, eight:8, nine:9,
+    ten:10, eleven:11, twelve:12, thirteen:13, fourteen:14, fifteen:15, sixteen:16,
+    seventeen:17, eighteen:18, nineteen:19,
+    // ordinals
+    first:1, second:2, third:3, fourth:4, fifth:5, sixth:6, seventh:7, eighth:8,
+    ninth:9, tenth:10, eleventh:11, twelfth:12, thirteenth:13, fourteenth:14,
+    fifteenth:15, sixteenth:16, seventeenth:17, eighteenth:18, nineteenth:19
+  };
+  const tens = {
+    twenty:20, thirty:30,
+    twentieth:20, thirtieth:30
+  };
+  const compOrdinals = {
+    'twenty first':21,  'twenty second':22, 'twenty third':23,
+    'twenty fourth':24, 'twenty fifth':25,  'twenty sixth':26,
+    'twenty seventh':27,'twenty eighth':28, 'twenty ninth':29,
+    'thirty first':31
+  };
+
+  if (ones[str] !== undefined) return ones[str];
+  if (tens[str] !== undefined) return tens[str];
+  if (compOrdinals[str] !== undefined) return compOrdinals[str];
+
+  // "twenty six" style (cardinal compound)
+  const parts = str.split(' ');
+  if (parts.length === 2) {
+    const t = tens[parts[0]];
+    const o = ones[parts[1]];
+    if (t !== undefined && o !== undefined) return t + o;
+  }
+
+  return NaN;
+}
+
+/* ════════════════════
+   TODAY AT MIDNIGHT
 ════════════════════ */
 function todayMidnight(){
   const t = new Date();
@@ -629,43 +667,128 @@ function todayMidnight(){
   return t;
 }
 
-function parseScheduleFromUserInput(text){
-  const months = {
-    jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11,
-    january:0,february:1,march:2,april:3,june:5,july:6,august:7,september:8,
-    october:9,november:10,december:11
-  };
-  const today = todayMidnight(); // FIX: use midnight so today is never "in the past"
-  let eventDate = null;
+/* ════════════════════
+   CORE DATE PARSER
+   FIXED: Uses last occurrence of a month+day in buffer (not first),
+   so "February twenty fifth" example doesn't shadow "February twenty sixth".
+   Also: fully relies on spokenToNum for word days.
+════════════════════ */
+function parseDateFromText(text) {
+  if (!text) return null;
 
-  // Named month match
-  const dm = text.match(/\b(january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sep|oct|nov|dec)\s+(\d{1,2})(?:st|nd|rd|th)?\b/i) ||
-             text.match(/\b(\d{1,2})(?:st|nd|rd|th)?\s+(january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sep|oct|nov|dec)\b/i);
-  if(dm){
-    let mStr, day;
-    if(isNaN(dm[1])){ mStr=dm[1].toLowerCase(); day=parseInt(dm[2]); }
-    else             { day=parseInt(dm[1]);       mStr=dm[2].toLowerCase(); }
-    const mIdx = months[mStr];
-    if(mIdx !== undefined && day >= 1 && day <= 31){
-      eventDate = new Date(today.getFullYear(), mIdx, day);
-      if(eventDate < today) eventDate.setFullYear(today.getFullYear()+1);
+  const months = {
+    jan:0,january:0, feb:1,february:1, mar:2,march:2,
+    apr:3,april:3,   may:4,            jun:5,june:5,
+    jul:6,july:6,    aug:7,august:7,   sep:8,september:8,
+    oct:9,october:9, nov:10,november:10, dec:11,december:11
+  };
+
+  const today = todayMidnight();
+  const lower = text.toLowerCase();
+
+  // Build day pattern (spoken + numeric)
+  const spokenDay = '(?:twenty|thirty)[- ](?:first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|one|two|three|four|five|six|seven|eight|nine)|thirty[ -]first|(?:first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth|eleventh|twelfth|thirteenth|fourteenth|fifteenth|sixteenth|seventeenth|eighteenth|nineteenth|twentieth|thirtieth)|(?:twenty|thirty)|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen';
+  const numDay   = '\\d{1,2}(?:st|nd|rd|th)?';
+  const dayPat   = `(?:${spokenDay}|${numDay})`;
+
+  const monthNames = 'january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sep|oct|nov|dec';
+
+  // Match "month day" OR "day of month" — collect ALL matches, use the LAST one
+  const r1 = new RegExp(`(${monthNames})\\s+(${dayPat})`, 'gi');
+  const r2 = new RegExp(`(${dayPat})\\s+(?:of\\s+)?(${monthNames})`, 'gi');
+
+  let lastMatch = null;
+  let lastIndex = -1;
+
+  let m;
+  while ((m = r1.exec(lower)) !== null) {
+    if (m.index > lastIndex) { lastIndex = m.index; lastMatch = { mStr: m[1], dayStr: m[2] }; }
+  }
+  while ((m = r2.exec(lower)) !== null) {
+    if (m.index > lastIndex) { lastIndex = m.index; lastMatch = { mStr: m[2], dayStr: m[1] }; }
+  }
+
+  if (lastMatch) {
+    const mIdx = months[lastMatch.mStr.toLowerCase().replace(/\./g,'')];
+    // Strip ordinal suffixes then try spokenToNum
+    const cleanDay = lastMatch.dayStr.toLowerCase().replace(/(st|nd|rd|th)$/, '').trim();
+    let day = spokenToNum(cleanDay);
+    if (isNaN(day)) day = parseInt(cleanDay);
+
+    if (mIdx !== undefined && !isNaN(day) && day >= 1 && day <= 31) {
+      let d = new Date(today.getFullYear(), mIdx, day);
+      if (d < today) d.setFullYear(today.getFullYear() + 1);
+      return d;
     }
   }
 
+  // Relative keywords
+  if (lower.includes('tomorrow'))  { const d = new Date(today); d.setDate(today.getDate()+1); return d; }
+  if (lower.includes('next week')) { const d = new Date(today); d.setDate(today.getDate()+7); return d; }
+  if (lower.includes('today'))     { return new Date(today); }
+
+  return null;
+}
+
+/* ════════════════════
+   SPOKEN TIME PARSER
+   FIXED: Handles "ten forty five AM", "three thirty PM" etc.
+════════════════════ */
+function parseSpokenTime(text) {
+  if (!text) return null;
   const lower = text.toLowerCase();
-  if(!eventDate && lower.includes('tomorrow')){ eventDate = new Date(today); eventDate.setDate(today.getDate()+1); }
-  if(!eventDate && lower.includes('next week')){ eventDate = new Date(today); eventDate.setDate(today.getDate()+7); }
-  if(!eventDate && lower.includes('today')){ eventDate = new Date(today); }
 
-  if(!eventDate) return null;
+  // Numeric: "10:45 am", "3:30 pm"
+  const numMatch = lower.match(/\b(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b/);
+  if (numMatch) {
+    return numMatch[1] + ':' + (numMatch[2] || '00') + ' ' + numMatch[3].toUpperCase();
+  }
 
-  // Time
-  const tm = text.match(/\b(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b/i) ||
-             text.match(/\bat\s+(\d{1,2})(?::(\d{2}))?\b/i);
-  let time = null;
-  if(tm){ const h=tm[1],m=tm[2]||'00',ap=tm[3]||''; time=`${h}:${m}${ap?' '+ap.toUpperCase():''}`; }
+  // Spoken: "ten forty five am", "three thirty pm", "nine am"
+  const hourWords = {
+    one:1, two:2, three:3, four:4, five:5, six:6, seven:7, eight:8,
+    nine:9, ten:10, eleven:11, twelve:12
+  };
+  const minuteWords = {
+    oh:0, zero:0, fifteen:15, thirty:30, 'forty five':45, 'forty-five':45,
+    forty:40, twenty:20, 'twenty five':25, 'twenty-five':25,
+    ten:10, five:5, fifty:50, 'fifty five':55
+  };
 
-  // Title
+  // Try "HOUR [MINUTE] am/pm"
+  const spokenMatch = lower.match(
+    /\b(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\s+(forty[ -]five|twenty[ -]five|fifty[ -]five|forty|thirty|twenty|fifteen|ten|oh|zero|fifty)\s*(am|pm)\b/
+  );
+  if (spokenMatch) {
+    const h = hourWords[spokenMatch[1]];
+    const minKey = spokenMatch[2].replace('-',' ');
+    const m = minuteWords[minKey] !== undefined ? minuteWords[minKey] : 0;
+    const ap = spokenMatch[3].toUpperCase();
+    return `${h}:${String(m).padStart(2,'0')} ${ap}`;
+  }
+
+  // "HOUR am/pm" only
+  const simpleMatch = lower.match(
+    /\b(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\s*(am|pm)\b/
+  );
+  if (simpleMatch) {
+    const h = hourWords[simpleMatch[1]];
+    return `${h}:00 ${simpleMatch[2].toUpperCase()}`;
+  }
+
+  return null;
+}
+
+/* ════════════════════
+   USER INPUT PARSER (text mode)
+════════════════════ */
+function parseScheduleFromUserInput(text){
+  const today = todayMidnight();
+  const eventDate = parseDateFromText(text);
+  if (!eventDate) return null;
+
+  const time = parseSpokenTime(text);
+
   const q  = text.match(/"([^"]+)"/);
   const kw = text.match(/\b(meeting|call|session|interview|appointment|standup|review|demo|lunch|dinner|coffee|sync|workshop|webinar|presentation|consultation)\b/i);
   const title = q ? q[1] : kw ? kw[0].charAt(0).toUpperCase()+kw[0].slice(1) : 'Scheduled Event';
@@ -683,9 +806,7 @@ function parseScheduleFromAIResponse(aiText){
   ];
   const hasConfirmation = confirmWords.some(w => lower.includes(w));
   let ev = parseScheduleFromUserInput(aiText);
-  if(!ev && lastUserUtterance) {
-    ev = parseScheduleFromUserInput(lastUserUtterance);
-  }
+  if(!ev && lastUserUtterance) ev = parseScheduleFromUserInput(lastUserUtterance);
   if(!hasConfirmation && !ev) return null;
   return ev;
 }
@@ -735,7 +856,6 @@ function renderEvents(){
   if(!scheduledEvent){ evEmpty.style.display='flex'; return; }
   evEmpty.style.display = 'none';
   const ev = scheduledEvent;
-  // FIX: compare dates at midnight so "today's" event shows as future
   const evMidnight = new Date(ev.date); evMidnight.setHours(0,0,0,0);
   const isFuture = evMidnight >= todayMidnight();
   const dateLabel = ev.date.toLocaleDateString('en-US',{month:'short',day:'numeric'});
@@ -782,30 +902,10 @@ function renderEvents(){
 
 /* ════════════════════
    GOOGLE CALENDAR LINK
-   FIX: Use account INDEX (/u/0/, /u/1/) not email in the URL.
-   Google ignores email addresses in that URL segment.
 ════════════════════ */
-// Detect which Google account index matches CALENDAR_EMAIL
-// by fetching /u/0/, /u/1/, /u/2/ and checking redirects for the email
-async function detectCalendarIndex(email){
-  for(let i = 0; i < 5; i++){
-    try {
-      const resp = await fetch(`https://calendar.google.com/calendar/u/${i}/r`, {
-        method: 'GET', credentials: 'include', redirect: 'follow', mode: 'no-cors'
-      });
-      // no-cors means we can't read the body — use a different approach:
-      // open a hidden iframe and check its final URL (won't work cross-origin either)
-      // Best reliable approach: try each index, open the right one
-    } catch(e){}
-  }
-  // Fallback: use the Google Accounts chooser URL which auto-selects by email
-  return null;
-}
-
 window.openGoogleCalendar = function(){
   if(!scheduledEvent) return;
 
-  // If backend returned a direct event link, use it
   if(scheduledEvent.gcalLink){
     window.open(scheduledEvent.gcalLink, '_blank');
     return;
@@ -814,11 +914,8 @@ window.openGoogleCalendar = function(){
   const ev = scheduledEvent, d = ev.date;
   const pad = n => String(n).padStart(2,'0');
   const dateStr = `${d.getFullYear()}/${pad(d.getMonth()+1)}/${pad(d.getDate())}`;
-
-  // AUTO-DETECT: use Google's authuser param with the email — this forces the correct
-  // account regardless of index order, no matter how many accounts are signed in.
   const url = `https://calendar.google.com/calendar/r/day/${dateStr}?authuser=${encodeURIComponent(CALENDAR_EMAIL)}`;
-  console.log('[SAMAY] Opening Google Calendar:', url, '(authuser:', CALENDAR_EMAIL, ')');
+  console.log('[SAMAY] Opening Google Calendar:', url);
   window.open(url, '_blank');
 };
 
@@ -854,96 +951,6 @@ function handleTextInput(text){
       await typeWrite("Tell me what you'd like to schedule — the event name, date, and time!");
     }, 800);
   }
-}
-
-/* ════════════════════
-   SIMPLE DATE EXTRACTOR (for user speech)
-════════════════════ */
-function parseDateFromText(text){
-  const months = {
-    jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11,
-    january:0,february:1,march:2,april:3,june:5,july:6,august:7,september:8,
-    october:9,november:10,december:11
-  };
-  // FIX: use midnight for "today" comparisons
-  const today = todayMidnight();
-  const lower = text.toLowerCase();
-  let d = null;
-
-  function spokenToNum(str) {
-    if(!str) return NaN;
-    str = str.toLowerCase().trim().replace(/[- ]+/g, ' ');
-    const ones = {
-      zero:0,one:1,two:2,three:3,four:4,five:5,six:6,seven:7,eight:8,nine:9,
-      ten:10,eleven:11,twelve:12,thirteen:13,fourteen:14,fifteen:15,sixteen:16,
-      seventeen:17,eighteen:18,nineteen:19,
-      first:1,second:2,third:3,fourth:4,fifth:5,sixth:6,seventh:7,eighth:8,
-      ninth:9,tenth:10,eleventh:11,twelfth:12,thirteenth:13,fourteenth:14,
-      fifteenth:15,sixteenth:16,seventeenth:17,eighteenth:18,nineteenth:19
-    };
-    const tens = {twenty:20,thirty:30,twentieth:20,thirtieth:30};
-    if(/^\d+$/.test(str)) return parseInt(str);
-    if(ones[str] !== undefined) return ones[str];
-    if(tens[str] !== undefined) return tens[str];
-    const parts = str.split(' ');
-    if(parts.length === 2){
-      const t = tens[parts[0]];
-      const o = ones[parts[1]];
-      if(t !== undefined && o !== undefined) return t + o;
-      const ordinalOnes = {first:1,second:2,third:3,fourth:4,fifth:5,sixth:6,seventh:7,eighth:8,ninth:9};
-      if(t !== undefined && ordinalOnes[parts[1]] !== undefined) return t + ordinalOnes[parts[1]];
-    }
-    return NaN;
-  }
-
-  const monthNames = 'january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sep|oct|nov|dec';
-  const tensW   = 'twenty|thirty';
-  const onesW   = 'one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen';
-  const ordW    = 'first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth|eleventh|twelfth|thirteenth|fourteenth|fifteenth|sixteenth|seventeenth|eighteenth|nineteenth|twentieth|thirtieth';
-  const compOrd = '(?:twenty|thirty)[- ](?:' + onesW + '|first|second|third|fourth|fifth|sixth|seventh|eighth|ninth)';
-  const dayPat  = '(?:' + compOrd + '|' + tensW + '|' + onesW + '|' + ordW + '|\\d{1,2}(?:st|nd|rd|th)?)';
-
-  const r1 = new RegExp('(' + monthNames + ')\\s+(' + dayPat + ')', 'i');
-  const r2 = new RegExp('(' + dayPat + ')\\s+(?:of\\s+)?(' + monthNames + ')', 'i');
-
-  let mStr, dayStr;
-  const m1 = lower.match(r1);
-  const m2 = lower.match(r2);
-
-  if(m1){ mStr = m1[1]; dayStr = m1[2]; }
-  else if(m2){ dayStr = m2[1]; mStr = m2[2]; }
-
-  if(mStr && dayStr){
-    const mIdx = months[mStr.toLowerCase().replace(/[.]/g,'')];
-    let day = parseInt(dayStr.replace(/[a-z]+/gi,''));
-    if(isNaN(day)) day = spokenToNum(dayStr.replace(/(st|nd|rd|th)/gi,'').trim());
-    if(mIdx !== undefined && !isNaN(day) && day >= 1 && day <= 31){
-      d = new Date(today.getFullYear(), mIdx, day);
-      // FIX: strictly less than (not <=) so today's date isn't pushed to next year
-      if(d < today) d.setFullYear(today.getFullYear() + 1);
-    }
-  }
-
-  if(!d){
-    const dm = text.match(/\b(january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sep|oct|nov|dec)\s+(\d{1,2})(?:st|nd|rd|th)?\b/i)
-            || text.match(/\b(\d{1,2})(?:st|nd|rd|th)?\s+(january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sep|oct|nov|dec)\b/i);
-    if(dm){
-      let ms, ds;
-      if(isNaN(dm[1])){ ms=dm[1]; ds=dm[2]; } else { ds=dm[1]; ms=dm[2]; }
-      const mIdx = months[ms.toLowerCase()];
-      const day  = parseInt(ds);
-      if(mIdx !== undefined && day >= 1 && day <= 31){
-        d = new Date(today.getFullYear(), mIdx, day);
-        if(d < today) d.setFullYear(today.getFullYear() + 1);
-      }
-    }
-  }
-
-  if(!d && lower.includes('tomorrow')){ d=new Date(today); d.setDate(today.getDate()+1); }
-  if(!d && lower.includes('next week')){ d=new Date(today); d.setDate(today.getDate()+7); }
-  if(!d && lower.includes('today'))   { d=new Date(today); }
-
-  return d;
 }
 
 /* ════════════════════
@@ -990,11 +997,9 @@ function wireVapi(){
 
     // ── 1. TOOL CALL ──
     if(msg.type === 'tool-calls' || msg.type === 'function-call'){
-      // LOG FULL RAW MESSAGE so we can see exact structure
       console.log('[VAPI TOOL RAW]', JSON.stringify(msg, null, 2));
       const toolList = msg.toolCallList || msg.toolCalls || (msg.functionCall ? [{ function: msg.functionCall }] : []);
       toolList.forEach(tool => {
-        // Vapi sometimes uses tool.function, sometimes tool directly
         const fn = tool.function || tool;
         const fnName = (fn?.name || '').toLowerCase();
         const fnArgs = fn?.arguments || tool?.arguments || '{}';
@@ -1002,20 +1007,15 @@ function wireVapi(){
         if(fnName.includes('schedule') || fnName.includes('meeting') || fnName.includes('calendar') || fnName.includes('event') || fnName.includes('book')){
           let args = fnArgs;
           if(typeof args === 'string') { try { args = JSON.parse(args); } catch(e){ args = {}; } }
-          console.log('[VAPI TOOL] schedule_meeting parsed args:', args);
 
-          // FIX: parse date robustly — handle ISO strings AND plain date strings
           let eventDate = null;
           if(args.date){
-            // Try ISO first (2025-02-26), then with time appended
             const raw = args.date.trim();
-            // If it's already a full ISO datetime
             if(/^\d{4}-\d{2}-\d{2}T/.test(raw)){
               eventDate = new Date(raw);
             } else if(/^\d{4}-\d{2}-\d{2}$/.test(raw)){
-              // Plain date — parse parts directly to avoid timezone shift
               const [y,m,dy] = raw.split('-').map(Number);
-              eventDate = new Date(y, m-1, dy); // local time, no UTC shift
+              eventDate = new Date(y, m-1, dy);
             } else {
               eventDate = new Date(raw);
             }
@@ -1045,7 +1045,6 @@ function wireVapi(){
       try {
         const result = typeof msg.result === 'string' ? JSON.parse(msg.result) : msg.result;
         if(result && (result.date || result.eventDate || result.htmlLink)){
-          // FIX: same robust date parsing for tool results
           let evDate = null;
           const rawDate = result.date || result.eventDate;
           if(rawDate){
@@ -1076,19 +1075,19 @@ function wireVapi(){
     if(msg.type === "transcript" && msg.transcriptType === "final"){
       showTyping(false);
       addMsg(msg.role === "user" ? "user" : "ai", msg.transcript);
+
       if(msg.role === "user"){
         lastUserUtterance = msg.transcript;
         allUserSpeech += ' ' + msg.transcript;
         userUtterances.push(msg.transcript);
         console.log('[VAPI] User said:', msg.transcript);
       }
+
       if(msg.role === "assistant"){
         const text = msg.transcript;
         console.log('[VAPI] Assistant said:', text);
         assistantBuffer += ' ' + text;
 
-        // STRICT: only open calendar when assistant says the exact keyword MEETING_CONFIRMED
-        // Matches any casing and optional separator: meeting_confirmed, MEETING CONFIRMED, meetingConfirmed, etc.
         const isConfirmed = /meeting[\s_-]?confirmed/i.test(text);
 
         if(isConfirmed){
@@ -1099,35 +1098,23 @@ function wireVapi(){
           let ev;
 
           if(pendingEvent){
-            // ── PREFERRED: use data from the tool call (most accurate) ──
             ev = { ...pendingEvent };
           } else {
-            // ── FALLBACK: parse from user speech, then assistant buffer ──
-            const gcalLink = null;
+            // FALLBACK: parse from user speech first (most reliable),
+            // then fall back to assistant buffer.
+            // Use parseDateFromText which now uses LAST match (not first).
             let eventDate = parseDateFromText(allUserSpeech);
-            // If user speech didn't yield a date, try assistant's spoken confirmation
-            // (assistant often repeats the date in its confirmation message)
-            if(!eventDate && assistantBuffer) {
+            if(!eventDate) {
               eventDate = parseDateFromText(assistantBuffer);
               console.log('[VAPI] Date from assistantBuffer:', eventDate, '| buffer:', assistantBuffer);
             }
             if(!eventDate) eventDate = new Date(Date.now() + 86400000);
 
-            const timeNums = {one:1,two:2,three:3,four:4,five:5,six:6,seven:7,eight:8,nine:9,ten:10,eleven:11,twelve:12};
-            let time = null;
-            const speech = allUserSpeech.toLowerCase();
-            const dtm = speech.match(/(\d{1,2})(?::(\d{2}))?\s*(am|pm)/);
-            if(dtm){
-              time = dtm[1] + ':' + (dtm[2]||'00') + ' ' + dtm[3].toUpperCase();
-            } else {
-              const wtm = speech.match(/(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)(\s+thirty)?\s*(am|pm)/);
-              if(wtm){
-                const h = timeNums[wtm[1]];
-                const m = wtm[2] ? '30' : '00';
-                time = h + ':' + m + ' ' + wtm[3].toUpperCase();
-              }
-            }
+            // Parse time from user speech first, then assistant buffer
+            let time = parseSpokenTime(allUserSpeech);
+            if(!time) time = parseSpokenTime(assistantBuffer);
 
+            // Extract title from user utterances
             const isDatePart = /(january|february|march|april|may|june|july|august|september|october|november|december|monday|tuesday|wednesday|thursday|friday|saturday|sunday|tomorrow|today|next|twenty|thirty|first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth|\d)/i;
             const isTimePart = /(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|\d)\s*(am|pm|ist)/i;
             const isFiller   = /^(yes|no|okay|ok|sure|thanks|thank|hello|hi|namaste|please|proceed|blank|leave|skip|none|no title|am|pm)$/i;
@@ -1143,14 +1130,13 @@ function wireVapi(){
               break;
             }
 
-            ev = { title, date: eventDate, time, gcalLink };
+            ev = { title, date: eventDate, time, gcalLink: null };
           }
 
           console.log('[VAPI] → goCalendar:', ev);
           showToast('✅ Meeting scheduled!', 2000);
           setTimeout(()=> goCalendar(ev, pendingEvent ? 'tool-call' : 'speech-parse'), 500);
 
-          // Reset
           pendingEvent    = null;
           assistantBuffer = '';
           allMeetingTitle = '';
