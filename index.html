@@ -25,16 +25,23 @@ body::after {
 }
 
 /* ══════════════════════════════════════
-   SCENE — hosts all three states
+   SCENE
 ══════════════════════════════════════ */
 .scene {
   width:100%; height:100%;
   position:relative;
   display:flex; align-items:center; justify-content:center;
+  transition: background 0.9s cubic-bezier(.65,0,.35,1);
+}
+.scene.calendar {
+  background: radial-gradient(ellipse at 15% 60%, rgba(45,90,39,0.12) 0%, transparent 55%),
+              radial-gradient(ellipse at 85% 25%, rgba(58,134,255,0.09) 0%, transparent 50%),
+              radial-gradient(ellipse at 55% 95%, rgba(212,252,121,0.06) 0%, transparent 45%),
+              #eeece9;
 }
 
 /* ══════════════════════════════════════
-   ORB — shared across state 1 & 2
+   ORB — exactly as provided
 ══════════════════════════════════════ */
 .orb-wrap {
   position:absolute;
@@ -75,19 +82,14 @@ body::after {
 
 .blob-1 { width:75%; height:75%; top:5%; left:0%; background:radial-gradient(circle,#4a9a3e 0%,#2D5A27 45%,transparent 72%); animation:blob1 18s ease-in-out infinite; opacity:.92; }
 @keyframes blob1 { 0%{transform:translate(0%,0%) scale(1)} 20%{transform:translate(18%,12%) scale(1.08)} 40%{transform:translate(28%,-5%) scale(0.95)} 60%{transform:translate(10%,22%) scale(1.12)} 80%{transform:translate(-8%,8%) scale(1.04)} 100%{transform:translate(0%,0%) scale(1)} }
-
 .blob-2 { width:70%; height:70%; top:20%; left:28%; background:radial-gradient(circle,#6ba3ff 0%,#3A86FF 40%,transparent 68%); animation:blob2 14s ease-in-out infinite; opacity:.85; }
 @keyframes blob2 { 0%{transform:translate(0%,0%) scale(1)} 25%{transform:translate(-22%,15%) scale(1.10)} 50%{transform:translate(-8%,30%) scale(0.92)} 75%{transform:translate(15%,12%) scale(1.06)} 100%{transform:translate(0%,0%) scale(1)} }
-
 .blob-3 { width:80%; height:65%; top:45%; left:10%; background:radial-gradient(circle,#e8ff9a 0%,#D4FC79 35%,#8ab82a 65%,transparent 78%); animation:blob3 22s ease-in-out infinite; opacity:.70; }
 @keyframes blob3 { 0%{transform:translate(0%,0%) scale(1)} 30%{transform:translate(15%,-20%) scale(1.15)} 55%{transform:translate(-10%,-8%) scale(0.90)} 80%{transform:translate(8%,18%) scale(1.08)} 100%{transform:translate(0%,0%) scale(1)} }
-
 .blob-4 { width:45%; height:45%; top:30%; left:38%; background:radial-gradient(circle,#7adc5e 0%,#3d8c2a 50%,transparent 70%); animation:blob4 10s ease-in-out infinite; opacity:.60; }
 @keyframes blob4 { 0%{transform:translate(0%,0%) scale(1)} 20%{transform:translate(-30%,-20%) scale(1.20)} 40%{transform:translate(20%,-30%) scale(0.85)} 60%{transform:translate(25%,20%) scale(1.15)} 80%{transform:translate(-15%,25%) scale(0.92)} 100%{transform:translate(0%,0%) scale(1)} }
-
 .blob-5 { width:55%; height:55%; top:0%; left:40%; background:radial-gradient(circle,#a8d4ff 0%,#5a9eff 30%,#2D5A27 65%,transparent 78%); animation:blob5 16s ease-in-out infinite reverse; opacity:.55; }
 @keyframes blob5 { 0%{transform:translate(0%,0%) scale(1)} 25%{transform:translate(-20%,30%) scale(1.12)} 50%{transform:translate(10%,20%) scale(0.88)} 75%{transform:translate(20%,-10%) scale(1.10)} 100%{transform:translate(0%,0%) scale(1)} }
-
 .blob-6 { width:50%; height:50%; top:55%; left:45%; background:radial-gradient(circle,#1a5ccc 0%,#0a2f80 55%,transparent 72%); animation:blob6 20s ease-in-out infinite; opacity:.75; mix-blend-mode:hard-light; }
 @keyframes blob6 { 0%{transform:translate(0%,0%) scale(1)} 35%{transform:translate(-25%,-15%) scale(1.18)} 65%{transform:translate(15%,-25%) scale(0.88)} 100%{transform:translate(0%,0%) scale(1)} }
 
@@ -99,7 +101,7 @@ body::after {
 @keyframes glossShift { 0%,100%{transform:translate(0%,0%) scale(1); opacity:.9} 40%{transform:translate(4%,6%) scale(1.1); opacity:1} 70%{transform:translate(-3%,2%) scale(.92); opacity:.8} }
 
 /* ══════════════════════════════════════
-   STATE 1 — IDLE BAR
+   STATE 1 — IDLE BAR (unchanged)
 ══════════════════════════════════════ */
 .idle-bar {
   position:absolute; bottom:56px; left:50%; transform:translateX(-50%);
@@ -128,7 +130,7 @@ body::after {
 .input-idle:focus { box-shadow:0 2px 16px rgba(0,0,0,0.12),0 0 0 1px rgba(0,0,0,0.08); }
 
 /* ══════════════════════════════════════
-   STATE 2 — ACTIVE CONVERSATION
+   STATE 2 — ACTIVE (unchanged)
 ══════════════════════════════════════ */
 .convo-area {
   position:absolute; inset:0;
@@ -181,147 +183,217 @@ body::after {
 .input-active:focus { border-color:rgba(60,130,220,0.72); box-shadow:0 0 0 4px rgba(60,130,220,0.13); }
 
 /* ══════════════════════════════════════
-   STATE 3 — CALENDAR VIEW
+   STATE 3 — SPLIT-PANEL CALENDAR
 ══════════════════════════════════════ */
 .calendar-view {
   position:absolute; inset:0;
-  display:flex; flex-direction:column;
-  padding:72px 20px 24px 20px;
+  display:flex; align-items:center; justify-content:center;
   opacity:0; pointer-events:none;
-  transition:opacity .5s .1s;
+  transition:opacity .55s .12s;
   z-index:10;
-  overflow:hidden;
+  padding:20px;
 }
 .scene.calendar .calendar-view { opacity:1; pointer-events:all; }
 
-/* Month header row (sits below the small orb) */
-.cal-header {
-  display:flex; align-items:center; justify-content:space-between;
-  margin-bottom:18px;
+/* Floating card */
+.cal-card {
+  width:100%; max-width:580px;
+  height:100%; max-height:400px;
+  border-radius:22px;
+  display:flex;
+  overflow:hidden;
+  box-shadow:0 28px 80px rgba(30,70,25,0.22), 0 8px 32px rgba(0,0,0,0.10);
+  animation:cardIn .65s cubic-bezier(.16,1,.3,1) both .05s;
+  margin-top:18px;
 }
-.cal-month-label {
-  font-size:20px; font-weight:600; color:var(--text);
-  letter-spacing:-0.3px;
+@keyframes cardIn {
+  from{opacity:0;transform:translateY(30px) scale(0.96);}
+  to{opacity:1;transform:translateY(0) scale(1);}
+}
+
+/* ── LEFT PANEL ── */
+.cal-left {
+  width:46%; flex-shrink:0;
+  background:linear-gradient(155deg, #1b4a16 0%, #13303d 52%, #0c1e3b 100%);
+  padding:20px 16px 16px;
+  display:flex; flex-direction:column;
+  position:relative; overflow:hidden;
+}
+/* Orb blob glow inside left panel */
+.cal-left::before {
+  content:''; position:absolute; inset:-30%;
+  width:160%; height:160%;
+  background:
+    radial-gradient(ellipse at 35% 38%, rgba(74,154,62,0.28) 0%, transparent 55%),
+    radial-gradient(ellipse at 75% 65%, rgba(58,134,255,0.16) 0%, transparent 50%),
+    radial-gradient(ellipse at 60% 10%, rgba(212,252,121,0.10) 0%, transparent 40%);
+  pointer-events:none;
+}
+
+.cal-left-header {
+  display:flex; align-items:center; gap:6px;
+  margin-bottom:18px; position:relative; z-index:1;
 }
 .cal-nav-btn {
-  width:34px; height:34px; border-radius:50%; border:none;
-  background:rgba(0,0,0,0.05); cursor:pointer;
+  width:24px; height:24px; border-radius:50%; border:none;
+  background:rgba(255,255,255,0.13); cursor:pointer;
   display:flex; align-items:center; justify-content:center;
-  transition:background .15s;
+  transition:background .15s, transform .12s; flex-shrink:0;
 }
-.cal-nav-btn:hover { background:rgba(0,0,0,0.10); }
-.cal-nav-btn svg { color:#555; }
+.cal-nav-btn:hover { background:rgba(255,255,255,0.24); transform:scale(1.10); }
+.cal-nav-btn svg { color:rgba(255,255,255,0.88); }
+.cal-month-label {
+  flex:1; font-size:14px; font-weight:600; color:#fff; letter-spacing:-0.1px;
+}
 
-/* Day-of-week headers */
+/* DOW row */
 .cal-dow {
   display:grid; grid-template-columns:repeat(7,1fr);
-  margin-bottom:8px;
+  margin-bottom:5px; position:relative; z-index:1;
 }
 .cal-dow span {
-  text-align:center; font-size:11px; font-weight:500;
-  color:var(--text-light); letter-spacing:.5px; text-transform:uppercase;
-  padding:4px 0;
+  text-align:center; font-size:9px; font-weight:500;
+  color:rgba(255,255,255,0.38); letter-spacing:.4px; text-transform:uppercase;
+  padding:2px 0;
 }
 
-/* Calendar grid */
+/* Grid */
 .cal-grid {
   display:grid; grid-template-columns:repeat(7,1fr);
-  gap:4px; flex:1;
+  gap:2px; flex:1; position:relative; z-index:1;
 }
-
 .cal-day {
-  aspect-ratio:1;
-  border-radius:10px;
-  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  aspect-ratio:1; border-radius:7px;
+  display:flex; flex-direction:column;
+  align-items:center; justify-content:center;
   cursor:pointer; position:relative;
-  transition:background .15s, transform .15s;
-  font-size:14px; font-weight:400; color:var(--text);
+  transition:background .13s, transform .13s;
+  font-size:11.5px; font-weight:400;
+  color:rgba(255,255,255,0.65);
 }
-.cal-day:hover { background:rgba(0,0,0,0.05); }
-.cal-day.empty { cursor:default; }
-.cal-day.today {
-  background:rgba(45,90,39,0.10);
-  color:var(--accent); font-weight:600;
-}
-.cal-day.today::after {
-  content:''; position:absolute; bottom:5px;
-  width:4px; height:4px; border-radius:50%; background:var(--accent);
+.cal-day:hover:not(.empty){ background:rgba(255,255,255,0.10); }
+.cal-day.empty{ cursor:default; pointer-events:none; }
+
+/* Today */
+.cal-day.today { color:#fff; font-weight:600; }
+.today-pip {
+  width:3px; height:3px; border-radius:50%;
+  background:#D4FC79; margin-top:1px;
 }
 
-/* Scheduled event on a day */
+/* Scheduled event — glowing blue-green circle like reference */
 .cal-day.has-event {
-  background:rgba(45,90,39,0.12);
+  background:radial-gradient(circle, rgba(58,134,255,0.60) 0%, rgba(45,90,39,0.45) 100%);
+  border:1.5px solid rgba(107,163,255,0.55);
+  color:#fff; font-weight:700;
+  transform:scale(1.10);
+  box-shadow:0 3px 16px rgba(58,134,255,0.40);
   cursor:pointer;
 }
-.cal-day.has-event:hover { background:rgba(45,90,39,0.20); transform:scale(1.06); }
-
-.event-dot {
-  width:5px; height:5px; border-radius:50%;
-  background:var(--accent); margin-top:2px;
+.cal-day.has-event:hover {
+  transform:scale(1.17);
+  box-shadow:0 5px 22px rgba(58,134,255,0.52);
+}
+.event-dot-inner {
+  width:4px; height:4px; border-radius:50%;
+  background:#D4FC79; margin-top:1px;
 }
 
-.event-chip {
-  position:absolute;
-  bottom:calc(100% + 6px); left:50%;
-  transform:translateX(-50%);
-  background:#fff;
-  border:1px solid rgba(0,0,0,0.08);
-  border-radius:10px;
-  padding:6px 10px;
-  white-space:nowrap;
-  font-size:11px; font-weight:500; color:var(--text);
-  box-shadow:0 4px 16px rgba(0,0,0,0.12);
-  pointer-events:none;
-  opacity:0; transform:translateX(-50%) translateY(4px);
-  transition:opacity .2s, transform .2s;
-  z-index:50;
-}
-.cal-day.has-event:hover .event-chip {
-  opacity:1; transform:translateX(-50%) translateY(0);
+/* ── RIGHT PANEL ── */
+.cal-right {
+  flex:1; background:#f8f7f5;
+  display:flex; flex-direction:column; overflow:hidden;
 }
 
-/* Event pill inside day */
-.event-pill {
-  width:80%; margin-top:2px;
-  background:var(--accent);
-  border-radius:4px;
-  padding:1px 3px;
-  font-size:8px; color:#fff; font-weight:500;
-  text-align:center;
+.cal-right-header {
+  padding:15px 15px 10px;
+  display:flex; align-items:center; justify-content:space-between;
+  border-bottom:1px solid rgba(0,0,0,0.06); flex-shrink:0;
+}
+.cal-right-info {}
+.cal-right-title {
+  font-size:13px; font-weight:600; color:#1c1c1c;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  max-width:160px;
+}
+.cal-right-sub { font-size:10px; color:#b0a898; margin-top:1px; }
+.cal-hdr-btns { display:flex; gap:4px; }
+.cal-hdr-btn {
+  width:26px; height:26px; border-radius:50%; border:none;
+  background:transparent; cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+  transition:background .13s;
+}
+.cal-hdr-btn:hover{ background:rgba(0,0,0,0.06); }
+.cal-hdr-btn svg { color:#bbb; }
+
+/* Timeline list */
+.cal-events { flex:1; overflow-y:auto; }
+.cal-events::-webkit-scrollbar{ display:none; }
+
+.ev-row {
+  display:flex; align-items:flex-start; gap:9px;
+  padding:11px 15px;
+  cursor:pointer;
+  transition:background .13s;
+  animation:evIn .38s cubic-bezier(.16,1,.3,1) both;
+}
+.ev-row:hover{ background:rgba(0,0,0,0.025); }
+@keyframes evIn{ from{opacity:0;transform:translateX(10px)} to{opacity:1;transform:translateX(0)} }
+
+.ev-date-col {
+  width:42px; flex-shrink:0;
+  font-size:10.5px; font-weight:600;
+  color:#c0b8ae; text-align:right;
+  padding-top:2px; white-space:nowrap;
+}
+
+/* Icon circle */
+.ev-icon {
+  width:30px; height:30px; border-radius:50%; flex-shrink:0;
+  display:flex; align-items:center; justify-content:center;
+}
+.ev-icon svg { width:13px; height:13px; }
+.ev-icon.new {
+  background:linear-gradient(135deg, #2D5A27 0%, #3A86FF 100%);
+}
+.ev-icon.new svg{ color:#fff; }
+.ev-icon.old {
+  background:#ece9e4;
+}
+.ev-icon.old svg{ color:#ccc; }
+
+.ev-body{ flex:1; min-width:0; }
+.ev-title {
+  font-size:12.5px; font-weight:600; color:#1c1c1c;
   white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
 }
+.ev-time{ font-size:10.5px; color:#b8b0a6; margin-top:1px; }
 
-/* Scheduled confirmation banner */
-.sched-banner {
-  background:#fff;
-  border-radius:14px;
-  padding:14px 16px;
-  display:flex; align-items:center; gap:12px;
-  box-shadow:0 2px 16px rgba(0,0,0,0.09);
-  margin-bottom:16px;
-  animation:bannerIn .5s cubic-bezier(.16,1,.3,1) both;
-  cursor:pointer;
-  transition:box-shadow .2s, transform .15s;
-  border:1px solid rgba(45,90,39,0.15);
+/* Badge */
+.ev-badge {
+  flex-shrink:0; margin-top:2px;
+  padding:2px 7px; border-radius:20px;
+  font-size:9.5px; font-weight:600; letter-spacing:.2px;
 }
-.sched-banner:hover { box-shadow:0 4px 24px rgba(0,0,0,0.13); transform:translateY(-1px); }
-@keyframes bannerIn { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} }
-
-.sched-icon {
-  width:40px; height:40px; border-radius:10px;
-  background:rgba(45,90,39,0.12);
-  display:flex; align-items:center; justify-content:center; flex-shrink:0;
+.badge-new {
+  background:linear-gradient(90deg,rgba(45,90,39,0.13),rgba(58,134,255,0.13));
+  color:#2D5A27; border:1px solid rgba(45,90,39,0.18);
 }
-.sched-icon svg { color:var(--accent); }
+.badge-done { background:#f0eeea; color:#ccc; }
 
-.sched-info { flex:1; }
-.sched-title { font-size:14px; font-weight:600; color:var(--text); }
-.sched-sub   { font-size:12px; color:var(--text-mid); margin-top:2px; }
+.ev-divider { height:1px; background:rgba(0,0,0,0.045); margin:0 15px; }
 
-.sched-arrow svg { color:var(--text-light); }
+/* Empty right panel */
+.ev-empty {
+  flex:1; display:flex; flex-direction:column;
+  align-items:center; justify-content:center;
+  color:#d5cfc8; font-size:12px; gap:6px;
+}
+.ev-empty svg{ opacity:.25; }
 
 /* ══════════════════════════════════════
-   TOAST
+   TOAST (unchanged)
 ══════════════════════════════════════ */
 .toast {
   position:fixed; bottom:24px; left:50%;
@@ -336,7 +408,6 @@ body::after {
 </head>
 <body>
 
-<!-- SVG noise filter -->
 <svg style="position:absolute;width:0;height:0;overflow:hidden" xmlns="http://www.w3.org/2000/svg">
   <defs>
     <filter id="orb-noise" x="0%" y="0%" width="100%" height="100%" color-interpolation-filters="sRGB">
@@ -357,7 +428,7 @@ body::after {
 
 <div class="scene" id="scene">
 
-  <!-- ══ ORB (persists across all states) ══ -->
+  <!-- ══ ORB (unchanged) ══ -->
   <div class="orb-wrap" id="orbWrap">
     <div class="orb" id="orb">
       <div class="orb-base"></div>
@@ -378,7 +449,7 @@ body::after {
     </div>
   </div>
 
-  <!-- ══ STATE 1: IDLE BAR ══ -->
+  <!-- ══ STATE 1: IDLE BAR (unchanged) ══ -->
   <div class="idle-bar" id="idleBar">
     <button class="btn-phone" id="callBtn">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
@@ -388,7 +459,7 @@ body::after {
     <input class="input-idle" id="idleInput" type="text" placeholder="Or type a message..." autocomplete="off"/>
   </div>
 
-  <!-- ══ STATE 2: ACTIVE CONVERSATION ══ -->
+  <!-- ══ STATE 2: ACTIVE CONVERSATION (unchanged) ══ -->
   <div class="convo-area">
     <div class="transcript" id="transcript">
       <div class="typing" id="typing"><span></span><span></span><span></span></div>
@@ -404,44 +475,57 @@ body::after {
     <input class="input-active" id="activeInput" type="text" placeholder="Type a message..." autocomplete="off"/>
   </div>
 
-  <!-- ══ STATE 3: CALENDAR VIEW ══ -->
+  <!-- ══ STATE 3: CALENDAR SPLIT-PANEL ══ -->
   <div class="calendar-view" id="calendarView">
+    <div class="cal-card">
 
-    <!-- Scheduled event banner (top) -->
-    <div class="sched-banner" id="schedBanner" style="display:none" onclick="openCalendar()">
-      <div class="sched-icon">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
-          <polyline points="9 16 11 18 15 14"/>
-        </svg>
+      <!-- LEFT: month grid -->
+      <div class="cal-left">
+        <div class="cal-left-header">
+          <button class="cal-nav-btn" onclick="changeMonth(-1)">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+          </button>
+          <span class="cal-month-label" id="calMonthLabel"></span>
+          <button class="cal-nav-btn" onclick="changeMonth(1)">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+          </button>
+        </div>
+        <div class="cal-dow">
+          <span>S</span><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span>
+        </div>
+        <div class="cal-grid" id="calGrid"></div>
       </div>
-      <div class="sched-info">
-        <div class="sched-title" id="schedTitle">Event Scheduled</div>
-        <div class="sched-sub"  id="schedSub">Tap to open in Calendar</div>
+
+      <!-- RIGHT: event timeline -->
+      <div class="cal-right">
+        <div class="cal-right-header">
+          <div class="cal-right-info">
+            <div class="cal-right-title" id="calRightTitle">Upcoming</div>
+            <div class="cal-right-sub" id="calRightSub">No events yet</div>
+          </div>
+          <div class="cal-hdr-btns">
+            <button class="cal-hdr-btn" title="Open Google Calendar" onclick="openCalendar()">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/>
+                <polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
+              </svg>
+            </button>
+            <button class="cal-hdr-btn">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
+                <circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+        <div class="cal-events" id="calEvents">
+          <div class="ev-empty">
+            <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+            Nothing scheduled yet
+          </div>
+        </div>
       </div>
-      <div class="sched-arrow">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
-      </div>
-    </div>
 
-    <!-- Month navigation -->
-    <div class="cal-header">
-      <button class="cal-nav-btn" onclick="changeMonth(-1)">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
-      </button>
-      <span class="cal-month-label" id="calMonthLabel"></span>
-      <button class="cal-nav-btn" onclick="changeMonth(1)">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
-      </button>
     </div>
-
-    <!-- Day of week headers -->
-    <div class="cal-dow">
-      <span>Su</span><span>Mo</span><span>Tu</span><span>We</span><span>Th</span><span>Fr</span><span>Sa</span>
-    </div>
-
-    <!-- Calendar grid -->
-    <div class="cal-grid" id="calGrid"></div>
   </div>
 
 </div>
@@ -459,36 +543,32 @@ const PUBLIC_KEY       = "1135bec2-5e08-4bdb-854e-1a311db0ff0b";
    STATE
 ═══════════════════════════════════ */
 let vapi = null, VapiClass = null;
-let appState = 'idle'; // idle | active | calendar
+let appState = 'idle';
 let greeted  = false;
-
-// Scheduled event data
-let scheduledEvent = null; // { title, date: Date, description }
-
-// Calendar display month
+let scheduledEvent = null;
 let calYear  = new Date().getFullYear();
-let calMonth = new Date().getMonth(); // 0-indexed
+let calMonth = new Date().getMonth();
 
 /* ═══════════════════════════════════
    ELEMENTS
 ═══════════════════════════════════ */
-const scene       = document.getElementById("scene");
-const transcript  = document.getElementById("transcript");
-const typing      = document.getElementById("typing");
-const activeInput = document.getElementById("activeInput");
-const idleInput   = document.getElementById("idleInput");
-const callBtn     = document.getElementById("callBtn");
-const hangupBtn   = document.getElementById("hangupBtn");
-const blobs       = document.getElementById("blobs");
-const toastEl     = document.getElementById("toast");
-const calGrid     = document.getElementById("calGrid");
-const calLabel    = document.getElementById("calMonthLabel");
-const schedBanner = document.getElementById("schedBanner");
-const schedTitle  = document.getElementById("schedTitle");
-const schedSub    = document.getElementById("schedSub");
+const scene         = document.getElementById("scene");
+const transcript    = document.getElementById("transcript");
+const typing        = document.getElementById("typing");
+const activeInput   = document.getElementById("activeInput");
+const idleInput     = document.getElementById("idleInput");
+const callBtn       = document.getElementById("callBtn");
+const hangupBtn     = document.getElementById("hangupBtn");
+const blobs         = document.getElementById("blobs");
+const toastEl       = document.getElementById("toast");
+const calGrid       = document.getElementById("calGrid");
+const calLabel      = document.getElementById("calMonthLabel");
+const calEvents     = document.getElementById("calEvents");
+const calRightTitle = document.getElementById("calRightTitle");
+const calRightSub   = document.getElementById("calRightSub");
 
 /* ═══════════════════════════════════
-   MOUSE PARALLAX (idle only)
+   MOUSE PARALLAX
 ═══════════════════════════════════ */
 let mx=0, my=0, tx=0, ty=0;
 document.addEventListener('mousemove', e => {
@@ -513,20 +593,17 @@ function showToast(msg, d=3000) {
   toastEl.textContent=msg; toastEl.classList.add("show");
   setTimeout(()=>toastEl.classList.remove("show"),d);
 }
-
 function setState(s) {
   appState = s;
   scene.classList.remove('active','calendar');
   if(s === 'active')   scene.classList.add('active');
   if(s === 'calendar') scene.classList.add('calendar');
 }
-
 function goActive() {
   if(appState==='active')return;
   setState('active');
   setTimeout(()=>activeInput.focus(), 680);
 }
-
 function goIdle() {
   greeted = false; vapi = null;
   setState('idle');
@@ -534,19 +611,13 @@ function goIdle() {
   typing.classList.remove("show");
   activeInput.value="";
 }
-
 function goCalendar(event) {
   scheduledEvent = event;
-  // Jump calendar to the event's month
   calYear  = event.date.getFullYear();
   calMonth = event.date.getMonth();
   renderCalendar();
+  renderEvents();
   setState('calendar');
-  // Show banner
-  schedBanner.style.display = 'flex';
-  schedTitle.textContent = event.title;
-  const opts = { weekday:'long', year:'numeric', month:'long', day:'numeric' };
-  schedSub.textContent = event.date.toLocaleDateString('en-US', opts) + (event.time ? ' · ' + event.time : '') + ' — Tap to open in Calendar';
 }
 
 /* ═══════════════════════════════════
@@ -577,7 +648,6 @@ function typeWrite(text, speed=24) {
     tick();
   });
 }
-
 async function doGreet() {
   if(greeted)return; greeted=true;
   goActive();
@@ -590,53 +660,41 @@ async function doGreet() {
 /* ═══════════════════════════════════
    CALENDAR RENDERER
 ═══════════════════════════════════ */
-const MONTHS = ["January","February","March","April","May","June",
-                "July","August","September","October","November","December"];
+const MONTHS       = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+const MONTHS_SHORT = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 
 function renderCalendar() {
-  const today = new Date();
-  const firstDay = new Date(calYear, calMonth, 1).getDay(); // 0=Sun
-  const daysInMonth = new Date(calYear, calMonth+1, 0).getDate();
+  const today      = new Date();
+  const firstDay   = new Date(calYear, calMonth, 1).getDay();
+  const daysInMonth= new Date(calYear, calMonth+1, 0).getDate();
 
-  calLabel.textContent = `${MONTHS[calMonth]} ${calYear}`;
+  calLabel.textContent = `${MONTHS_SHORT[calMonth]}.${calYear}`;
   calGrid.innerHTML = '';
 
-  // Empty cells before first day
-  for(let i=0; i<firstDay; i++){
-    const empty = document.createElement('div');
-    empty.className='cal-day empty';
-    calGrid.appendChild(empty);
+  for(let i=0;i<firstDay;i++){
+    const e=document.createElement('div'); e.className='cal-day empty'; calGrid.appendChild(e);
   }
 
-  // Day cells
-  for(let d=1; d<=daysInMonth; d++){
-    const cell = document.createElement('div');
-    cell.className = 'cal-day';
-    cell.textContent = d;
+  for(let d=1;d<=daysInMonth;d++){
+    const cell=document.createElement('div'); cell.className='cal-day';
 
-    // Today marker
-    if(d===today.getDate() && calMonth===today.getMonth() && calYear===today.getFullYear()){
+    const numEl=document.createElement('span'); numEl.className='cal-day-num'; numEl.textContent=d;
+    cell.appendChild(numEl);
+
+    // Today
+    if(d===today.getDate()&&calMonth===today.getMonth()&&calYear===today.getFullYear()){
       cell.classList.add('today');
+      const pip=document.createElement('div'); pip.className='today-pip'; cell.appendChild(pip);
     }
 
-    // Scheduled event marker
-    if(scheduledEvent) {
-      const ev = scheduledEvent.date;
-      if(d===ev.getDate() && calMonth===ev.getMonth() && calYear===ev.getFullYear()){
+    // Scheduled event
+    if(scheduledEvent){
+      const ev=scheduledEvent.date;
+      if(d===ev.getDate()&&calMonth===ev.getMonth()&&calYear===ev.getFullYear()){
         cell.classList.add('has-event');
-        // Event pill
-        const pill = document.createElement('div');
-        pill.className = 'event-pill';
-        pill.textContent = scheduledEvent.title;
-        cell.appendChild(pill);
-        // Hover chip
-        const chip = document.createElement('div');
-        chip.className = 'event-chip';
-        chip.textContent = `📅 ${scheduledEvent.title}${scheduledEvent.time ? ' · '+scheduledEvent.time : ''}`;
-        cell.appendChild(chip);
-        // Click → open calendar
+        const dot=document.createElement('div'); dot.className='event-dot-inner'; cell.appendChild(dot);
         cell.addEventListener('click', openCalendar);
-        cell.title = 'Click to open in Calendar';
+        cell.title='Click to open in Google Calendar';
       }
     }
 
@@ -644,200 +702,210 @@ function renderCalendar() {
   }
 }
 
+/* ═══════════════════════════════════
+   EVENT TIMELINE RENDERER
+═══════════════════════════════════ */
+function renderEvents() {
+  calEvents.innerHTML='';
+
+  if(!scheduledEvent){
+    calEvents.innerHTML=`<div class="ev-empty"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>Nothing scheduled yet</div>`;
+    return;
+  }
+
+  const ev = scheduledEvent;
+  calRightTitle.textContent = ev.title;
+  calRightSub.textContent   = ev.date.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
+
+  // Two "past" rows for context
+  const pastRows=[
+    {label:'Earlier', title:'Morning Standup', time:'09:00 AM', delay:'.18s'},
+    {label:'Earlier', title:'Product Review',  time:'02:00 PM', delay:'.26s'},
+  ];
+  pastRows.forEach(pr=>{
+    const r=document.createElement('div'); r.className='ev-row'; r.style.animationDelay=pr.delay; r.style.opacity='.45';
+    r.innerHTML=`
+      <div class="ev-date-col">${pr.label}</div>
+      <div class="ev-icon old"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 15"/></svg></div>
+      <div class="ev-body"><div class="ev-title">${pr.title}</div><div class="ev-time">${pr.time}</div></div>
+      <div class="ev-badge badge-done">Done</div>`;
+    calEvents.appendChild(r);
+    const dv=document.createElement('div'); dv.className='ev-divider'; calEvents.appendChild(dv);
+  });
+
+  // ── The newly scheduled event (highlighted) ──
+  const dateLabel = `${MONTHS_SHORT[ev.date.getMonth()]}.${ev.date.getDate()}`;
+  const row=document.createElement('div'); row.className='ev-row'; row.style.animationDelay='.06s';
+  row.innerHTML=`
+    <div class="ev-date-col" style="color:#3A86FF;font-weight:700">${dateLabel}</div>
+    <div class="ev-icon new">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><polyline points="9 16 11 18 15 14"/>
+      </svg>
+    </div>
+    <div class="ev-body">
+      <div class="ev-title">${ev.title}</div>
+      <div class="ev-time">${ev.time||'All day'}</div>
+    </div>
+    <div class="ev-badge badge-new">Upcoming</div>`;
+  row.addEventListener('click', openCalendar);
+  row.style.cursor='pointer';
+  calEvents.appendChild(row);
+}
+
 window.changeMonth = function(dir) {
   calMonth += dir;
-  if(calMonth > 11){ calMonth=0; calYear++; }
-  if(calMonth < 0) { calMonth=11; calYear--; }
+  if(calMonth>11){calMonth=0;calYear++;}
+  if(calMonth<0){calMonth=11;calYear--;}
   renderCalendar();
 };
 
 /* ═══════════════════════════════════
-   OPEN REAL CALENDAR
+   OPEN GOOGLE CALENDAR
 ═══════════════════════════════════ */
 window.openCalendar = function() {
   if(!scheduledEvent) return;
   const ev = scheduledEvent;
   const d  = ev.date;
-
-  // Format for Google Calendar
-  // Date format: YYYYMMDD
   const pad = n => String(n).padStart(2,'0');
   const dateStr = `${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}`;
 
-  // Try to figure out time (default to 10am if not specified)
   let startTime = ev.time || '10:00';
-  const [hh, mm] = startTime.replace(/[apm\s]/gi,'').split(':');
+  const parts = startTime.replace(/[apm\s]/gi,'').split(':');
   const isPM = /pm/i.test(startTime);
-  let h = parseInt(hh);
+  let h = parseInt(parts[0]), m = parseInt(parts[1]||0);
   if(isPM && h<12) h+=12;
   if(!isPM && h===12) h=0;
-  const startDT = `${dateStr}T${pad(h)}${pad(parseInt(mm||0))}00`;
-  const endH    = (h+1)%24;
-  const endDT   = `${dateStr}T${pad(endH)}${pad(parseInt(mm||0))}00`;
+  const startDT = `${dateStr}T${pad(h)}${pad(m)}00`;
+  const endDT   = `${dateStr}T${pad((h+1)%24)}${pad(m)}00`;
 
-  const title = encodeURIComponent(ev.title);
+  const title   = encodeURIComponent(ev.title);
   const details = encodeURIComponent(ev.description || 'Scheduled via SAMAY');
-  const gcalURL = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${startDT}/${endDT}&details=${details}`;
-
-  window.open(gcalURL, '_blank');
+  window.open(`https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${startDT}/${endDT}&details=${details}`,'_blank');
 };
 
 /* ═══════════════════════════════════
    EVENT PARSER
-   Tries to detect scheduling intent from transcript
 ═══════════════════════════════════ */
 function parseScheduleFromText(text) {
-  // Patterns: "scheduled ... on [date]", "set up ... for [date]", etc.
   const lower = text.toLowerCase();
-  const scheduled = lower.includes('scheduled') || lower.includes('booked') ||
-                    lower.includes('set up') || lower.includes('confirmed') ||
-                    lower.includes('added to') || lower.includes('i\'ve scheduled');
+  const scheduled = lower.includes('scheduled')||lower.includes('booked')||
+                    lower.includes('set up')||lower.includes('confirmed')||
+                    lower.includes('added to')||lower.includes("i've scheduled");
   if(!scheduled) return null;
 
-  // Try to extract a date
-  const months = { jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11,
-                   january:0,february:1,march:2,april:3,june:5,july:6,august:7,september:8,october:9,november:10,december:11 };
-  const today = new Date();
-  let eventDate = null;
+  const months={jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11,
+    january:0,february:1,march:2,april:3,june:5,july:6,august:7,september:8,october:9,november:10,december:11};
+  const today=new Date(); let eventDate=null;
 
-  // Match "March 5", "5th March", "March 5th", etc.
-  const dateMatch = text.match(/\b(january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sep|oct|nov|dec)\s+(\d{1,2})(?:st|nd|rd|th)?\b/i) ||
-                    text.match(/\b(\d{1,2})(?:st|nd|rd|th)?\s+(january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sep|oct|nov|dec)\b/i);
-
-  if(dateMatch) {
-    let mStr, day;
-    if(isNaN(dateMatch[1])) { mStr=dateMatch[1].toLowerCase(); day=parseInt(dateMatch[2]); }
-    else                    { day=parseInt(dateMatch[1]); mStr=dateMatch[2].toLowerCase(); }
-    const mIdx = months[mStr];
-    if(mIdx !== undefined && day >= 1 && day <= 31) {
-      eventDate = new Date(today.getFullYear(), mIdx, day);
-      if(eventDate < today) eventDate.setFullYear(today.getFullYear()+1);
+  const dm=text.match(/\b(january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sep|oct|nov|dec)\s+(\d{1,2})(?:st|nd|rd|th)?\b/i)||
+            text.match(/\b(\d{1,2})(?:st|nd|rd|th)?\s+(january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sep|oct|nov|dec)\b/i);
+  if(dm){
+    let mStr,day;
+    if(isNaN(dm[1])){mStr=dm[1].toLowerCase();day=parseInt(dm[2]);}
+    else{day=parseInt(dm[1]);mStr=dm[2].toLowerCase();}
+    const mIdx=months[mStr];
+    if(mIdx!==undefined&&day>=1&&day<=31){
+      eventDate=new Date(today.getFullYear(),mIdx,day);
+      if(eventDate<today)eventDate.setFullYear(today.getFullYear()+1);
     }
   }
+  if(!eventDate&&lower.includes('tomorrow')){eventDate=new Date(today);eventDate.setDate(today.getDate()+1);}
+  if(!eventDate&&lower.includes('next week')){eventDate=new Date(today);eventDate.setDate(today.getDate()+7);}
+  if(!eventDate)return null;
 
-  // "tomorrow" / "next [weekday]"
-  if(!eventDate && lower.includes('tomorrow')) {
-    eventDate = new Date(today); eventDate.setDate(today.getDate()+1);
-  }
-  if(!eventDate && lower.includes('next week')) {
-    eventDate = new Date(today); eventDate.setDate(today.getDate()+7);
-  }
+  const tm=text.match(/\b(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b/i)||text.match(/\bat\s+(\d{1,2})(?::(\d{2}))?\b/i);
+  let time=null;
+  if(tm){const h=tm[1],m=tm[2]||'00',ap=tm[3]||'';time=`${h}:${m}${ap?' '+ap.toUpperCase():''}`;}
 
-  if(!eventDate) return null;
-
-  // Extract time
-  const timeMatch = text.match(/\b(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b/i) ||
-                    text.match(/\bat\s+(\d{1,2})(?::(\d{2}))?\b/i);
-  let time = null;
-  if(timeMatch) {
-    const h = timeMatch[1], m = timeMatch[2]||'00', ampm = timeMatch[3]||'';
-    time = `${h}:${m}${ampm ? ' '+ampm.toUpperCase() : ''}`;
-  }
-
-  // Extract title — look for quoted text or "meeting/call/session/interview" etc.
-  const quotedMatch  = text.match(/"([^"]+)"/);
-  const eventKeyword = text.match(/\b(meeting|call|session|interview|appointment|standup|review|demo|lunch|dinner|coffee|sync|workshop|webinar|presentation|consultation)\b/i);
-  const title = quotedMatch ? quotedMatch[1]
-              : eventKeyword ? eventKeyword[0].charAt(0).toUpperCase() + eventKeyword[0].slice(1)
-              : 'Scheduled Event';
-
-  return { title, date: eventDate, time, description: text };
+  const quoted=text.match(/"([^"]+)"/);
+  const kw=text.match(/\b(meeting|call|session|interview|appointment|standup|review|demo|lunch|dinner|coffee|sync|workshop|webinar|presentation|consultation)\b/i);
+  const title=quoted?quoted[1]:kw?kw[0].charAt(0).toUpperCase()+kw[0].slice(1):'Scheduled Event';
+  return{title,date:eventDate,time,description:text};
 }
 
 /* ═══════════════════════════════════
    VAPI
 ═══════════════════════════════════ */
 async function loadVapi() {
-  try {
-    const mod = await import("./vapi-bundle.js");
-    VapiClass = mod.default ?? mod.Vapi ?? mod.VapiSDK;
-    if(typeof VapiClass !== "function" && VapiClass?.default) VapiClass = VapiClass.default;
-  } catch(e){ console.warn("[Vapi] bundle missing"); }
+  try{
+    const mod=await import("./vapi-bundle.js");
+    VapiClass=mod.default??mod.Vapi??mod.VapiSDK;
+    if(typeof VapiClass!=="function"&&VapiClass?.default)VapiClass=VapiClass.default;
+  }catch(e){console.warn("[Vapi] bundle missing");}
 }
 await loadVapi();
 
 function wireVapi() {
-  vapi.on("call-start", ()=>{ goActive(); showToast("✓ Connected"); });
-  vapi.on("call-end",   ()=>{ showToast("Call ended"); });
-  vapi.on("speech-start", ()=>showTyping(true));
-  vapi.on("speech-end",   ()=>showTyping(false));
-  vapi.on("message", msg=>{
-    if(msg.type==="transcript" && msg.transcriptType==="final"){
+  vapi.on("call-start",()=>{goActive();showToast("✓ Connected");});
+  vapi.on("call-end",()=>{showToast("Call ended");});
+  vapi.on("speech-start",()=>showTyping(true));
+  vapi.on("speech-end",()=>showTyping(false));
+  vapi.on("message",msg=>{
+    if(msg.type==="transcript"&&msg.transcriptType==="final"){
       showTyping(false);
-      addMsg(msg.role==="user"?"user":"ai", msg.transcript);
-      // Check if AI just scheduled something
+      addMsg(msg.role==="user"?"user":"ai",msg.transcript);
       if(msg.role==="assistant"){
-        const ev = parseScheduleFromText(msg.transcript);
-        if(ev) {
+        const ev=parseScheduleFromText(msg.transcript);
+        if(ev){
           setTimeout(()=>{
-            showToast(`✅ "${ev.title}" scheduled!`, 3000);
-            setTimeout(()=>goCalendar(ev), 1800);
-          }, 600);
+            showToast(`✅ "${ev.title}" scheduled!`,3000);
+            setTimeout(()=>goCalendar(ev),1800);
+          },600);
         }
       }
     }
   });
-  vapi.on("error", err=>{
-    showToast("⚠ "+(err?.message||"Error"),5000);
-    goIdle(); vapi=null;
-  });
+  vapi.on("error",err=>{showToast("⚠ "+(err?.message||"Error"),5000);goIdle();vapi=null;});
 }
 
 async function startCall() {
-  if(!VapiClass){ showToast("⚠ vapi-bundle.js missing"); return; }
-  if(vapi) return;
-  try {
-    vapi = new VapiClass(PUBLIC_KEY); wireVapi();
-    await vapi.start(ASSISTANT_ID);
-  } catch(e){ showToast("⚠ "+(e.message||"Could not start")); vapi=null; }
+  if(!VapiClass){showToast("⚠ vapi-bundle.js missing");return;}
+  if(vapi)return;
+  try{vapi=new VapiClass(PUBLIC_KEY);wireVapi();await vapi.start(ASSISTANT_ID);}
+  catch(e){showToast("⚠ "+(e.message||"Could not start"));vapi=null;}
 }
 
 /* ═══════════════════════════════════
-   DEMO: trigger calendar state from text
-   Type something like "schedule a meeting on March 15 at 2pm"
+   TEXT HANDLER (demo/fallback)
 ═══════════════════════════════════ */
 function handleTextInput(text) {
-  addMsg("user", text);
-  // Check if user typed a scheduling request — simulate AI response
-  const lower = text.toLowerCase();
-  const isScheduleRequest = lower.match(/schedule|book|set up|meeting|appointment|call|remind/);
-  if(isScheduleRequest) {
+  addMsg("user",text);
+  const lower=text.toLowerCase();
+  const isScheduleRequest=lower.match(/schedule|book|set up|meeting|appointment|call|remind/);
+  if(isScheduleRequest){
     showTyping(true);
-    setTimeout(async ()=>{
-      // Simulate AI confirming
-      const ev = parseScheduleFromText(text);
-      const aiResponse = ev
-        ? `I've scheduled "${ev.title}" for ${ev.date.toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'})}${ev.time?' at '+ev.time:''}. I've added it to your calendar!`
-        : `I've noted that down! Could you give me the date and time for this event?`;
+    setTimeout(async()=>{
+      const ev=parseScheduleFromText(text);
+      const aiResponse=ev
+        ?`I've scheduled "${ev.title}" for ${ev.date.toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'})}${ev.time?' at '+ev.time:''}. I've added it to your calendar!`
+        :`I've noted that down! Could you give me the date and time for this event?`;
       showTyping(false);
       await typeWrite(aiResponse);
-      if(ev) {
+      if(ev){
         setTimeout(()=>{
-          showToast(`✅ "${ev.title}" scheduled!`, 3000);
-          setTimeout(()=>goCalendar(ev), 1600);
-        }, 800);
+          showToast(`✅ "${ev.title}" scheduled!`,3000);
+          setTimeout(()=>goCalendar(ev),1600);
+        },800);
       }
-    }, 1200);
-  } else {
+    },1200);
+  }else{
     showTyping(true);
-    setTimeout(async ()=>{
+    setTimeout(async()=>{
       showTyping(false);
       await typeWrite("Sure! Tell me what you'd like to schedule — the event name, date, and time, and I'll get it set up for you.");
-    }, 1000);
+    },1000);
   }
 }
 
 /* ═══════════════════════════════════
-   EVENTS
+   EVENT LISTENERS
 ═══════════════════════════════════ */
-callBtn.addEventListener("click", async()=>{
-  await doGreet();
-  startCall();
-});
+callBtn.addEventListener("click",async()=>{await doGreet();startCall();});
 
-idleInput.addEventListener("keydown", async e=>{
-  if(e.key==="Enter" && idleInput.value.trim()){
-    const v = idleInput.value.trim(); idleInput.value="";
+idleInput.addEventListener("keydown",async e=>{
+  if(e.key==="Enter"&&idleInput.value.trim()){
+    const v=idleInput.value.trim(); idleInput.value="";
     if(!greeted){
       greeted=true; goActive();
       showTyping(true);
@@ -849,24 +917,17 @@ idleInput.addEventListener("keydown", async e=>{
   }
 });
 
-activeInput.addEventListener("keydown", e=>{
-  if(e.key==="Enter" && activeInput.value.trim()){
-    const v = activeInput.value.trim(); activeInput.value="";
-    if(vapi?.send) {
-      addMsg("user", v);
-      vapi.send({type:"add-message", message:{role:"user", content:v}});
-    } else {
-      handleTextInput(v);
-    }
+activeInput.addEventListener("keydown",e=>{
+  if(e.key==="Enter"&&activeInput.value.trim()){
+    const v=activeInput.value.trim(); activeInput.value="";
+    if(vapi?.send){addMsg("user",v);vapi.send({type:"add-message",message:{role:"user",content:v}});}
+    else handleTextInput(v);
   }
 });
 
-hangupBtn.addEventListener("click", ()=>{
-  if(vapi) vapi.stop();
-  goIdle();
-});
+hangupBtn.addEventListener("click",()=>{if(vapi)vapi.stop();goIdle();});
 
-// Init calendar on load
+// Init
 renderCalendar();
 </script>
 </body>
