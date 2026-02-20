@@ -106,17 +106,32 @@ The keyword `MEETING_CONFIRMED` is the **sole trigger** for opening the calendar
 ## 📸 Screenshots & Logs
 
 ### Debug Panel (live event data)
-![Debug panel showing title, date, time, and Google Calendar URL](screenshots/debug_panel.png)
+<img width="359" height="263" alt="image" src="https://github.com/user-attachments/assets/759e6b44-3e66-49ec-9a62-fd5dc17f696e" />
+<img width="1343" height="435" alt="image" src="https://github.com/user-attachments/assets/97b22ec3-6e80-4808-b239-9f8e29da50bf" />
+
+
+
 
 ### Calendar View (correct date highlighted)
-![February 2026 calendar with Feb 26 highlighted in green](screenshots/calendar_view.png)
+<img width="1920" height="1020" alt="image" src="https://github.com/user-attachments/assets/dbc207d7-e356-4701-9d61-cdccacf5b44c" />
+
 
 ### Console Log Sample
 
 ```
-[VAPI] ✅ MEETING_CONFIRMED keyword detected
-[SAMAY] goCalendar called with: { title: 'Anand.', date: Sun Feb 26 2026, time: '10:00 PM' }
-[SAMAY] Opening Google Calendar: .../r/day/2026/02/26?authuser=1mp22cs021@gmail.com
+[VAPI] Assistant said: You're meeting Mangoes is scheduled for February twenty sixth at three thirty PM. Meeting confirmed.
+Vikara-ai-assessment/:1095 [VAPI] ✅ MEETING_CONFIRMED keyword detected in: You're meeting Mangoes is scheduled for February twenty sixth at three thirty PM. Meeting confirmed.
+Vikara-ai-assessment/:1096 [VAPI] pendingEvent: null
+Vikara-ai-assessment/:1097 [VAPI] allUserSpeech:  Hello Akas. Schedule a meeting. Burdenango On February twenty six. Three thirty PM. Mangoes.
+Vikara-ai-assessment/:1149 [VAPI] → goCalendar: {title: 'Mangoes.', date: Thu Feb 26 2026 00:00:00 GMT+0530 (India Standard Time), time: '3:30 PM', gcalLink: null}
+Vikara-ai-assessment/:989 [VAPI MESSAGE] type: conversation-update
+Vikara-ai-assessment/:989 [VAPI MESSAGE] type: speech-update
+Vikara-ai-assessment/:579 [SAMAY] goCalendar called with: {title: 'Mangoes.', date: Thu Feb 26 2026 00:00:00 GMT+0530 (India Standard Time), time: '3:30 PM', gcalLink: null}
+Vikara-ai-assessment/:575 [DEBUG] title: Mangoes. | date: 2026/02/26 | time: 3:30 PM | source: speech-parse | url: https://calendar.google.com/calendar/r/day/2026/02/26?authuser=1mp22cs021%40gmail.com
+Vikara-ai-assessment/:540 [SAMAY] state → calendar | scene classes: scene calendar
+Vikara-ai-assessment/:984 [VAPI EVENT] speech-end
+Vikara-ai-assessment/:821 [SAMAY] Opening Google Calendar: https://calendar.google.com/calendar/r/day/2026/02/26?authuser=1mp22cs021%40gmail.com (authuser: 1mp22cs021@gmail.com )
+Vikara-ai-assessment/:989 [VAPI MESSAGE] type: status-update
 ```
 
 ---
