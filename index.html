@@ -717,21 +717,24 @@ function renderEvents(){
 /* ════════════════════
    GOOGLE CALENDAR
 ════════════════════ */
+// ── Set this to the Gmail address used in your calendar.py ──
+const CALENDAR_EMAIL = '1mp22cs021@gmail.com';
+
 window.openGoogleCalendar = function(){
   if(!scheduledEvent) return;
 
-  // If we have the actual event link from backend — go straight to it
+  // If backend returned a direct event link, use it
   if(scheduledEvent.gcalLink){
     window.open(scheduledEvent.gcalLink, '_blank');
     return;
   }
 
-  // Otherwise build a view URL for the correct date (not create-event)
+  // Build day-view URL forcing the correct Google account
   const ev = scheduledEvent, d = ev.date;
   const pad = n => String(n).padStart(2,'0');
-  // Build day view URL: shows the specific day with the event visible
   const dateStr = `${d.getFullYear()}/${pad(d.getMonth()+1)}/${pad(d.getDate())}`;
-  window.open(`https://calendar.google.com/calendar/r/day/${dateStr}`, '_blank');
+  // /u/EMAIL/ forces Google Calendar to open as that specific account
+  window.open(`https://calendar.google.com/calendar/u/${CALENDAR_EMAIL}/r/day/${dateStr}`, '_blank');
 };
 
 /* ════════════════════
@@ -1024,6 +1027,7 @@ function wireVapi(){
           // TITLE — last substantive thing user said that isn't a date/time/name/filler
           // Walk through all user utterances and find one that looks like a title
           const stopWords = /^(yes|no|okay|ok|sure|thanks|thank|am|pm|ist|hello|hi|namaste|please|proceed|blank|leave|skip|none|no title)$/i;
+          const timePattern = /^\d{1,2}(?::\d{2})?\s*(am|pm|ist)$|^(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)(\s+thirty)?\s*(am|pm|ist)$/i;
           const dateTimePattern = /(january|february|march|april|may|june|july|august|september|october|november|december|monday|tuesday|wednesday|thursday|friday|saturday|sunday|tomorrow|today|next|am|pm|ist|\d{1,2})/i;
           const userParts = allUserSpeech.trim().split(/\s*\.\s*|\s{2,}/).map(s => s.trim()).filter(Boolean);
           let title = 'Meeting';
@@ -1032,6 +1036,7 @@ function wireVapi(){
             const part = userParts[i].trim();
             if(part.length < 2) continue;
             if(stopWords.test(part)) continue;
+            if(timePattern.test(part)) continue;
             if(dateTimePattern.test(part) && part.split(' ').length <= 4) continue;
             title = part.charAt(0).toUpperCase() + part.slice(1);
             break;
