@@ -799,53 +799,75 @@ function wireVapi(){
     showTyping(false);
   });
 
-  // Log ALL messages — this is how we find the exact trigger
   vapi.on("message", msg=>{
-    console.log('[VAPI MESSAGE] type:', msg.type, '| full:', JSON.stringify(msg));
+    console.log('[VAPI MESSAGE] type:', msg.type);
 
-    // ── Tool call result (agent used a function like createEvent) ──
-    if(msg.type === 'function-call' || msg.type === 'tool-call' ||
-       msg.type === 'tool-calls' || msg.type === 'function-call-result' ||
-       (msg.type === 'tool-call-result')){
-      console.log('[VAPI TOOL CALL] name:', msg.functionCall?.name || msg.toolCallList?.[0]?.function?.name, 'result:', JSON.stringify(msg));
-      // If agent called any scheduling/calendar function, go to calendar
-      const fnName = (msg.functionCall?.name || msg.toolCallList?.[0]?.function?.name || '').toLowerCase();
-      if(fnName.match(/schedule|calendar|event|booking|create|add/)){
-        const args = msg.functionCall?.parameters || msg.toolCallList?.[0]?.function?.arguments || {};
-        const parsedArgs = typeof args === 'string' ? JSON.parse(args) : args;
-        const ev = {
-          title: parsedArgs.title || parsedArgs.summary || parsedArgs.name || parsedArgs.eventName || 'Meeting',
-          date:  parsedArgs.date ? new Date(parsedArgs.date) : new Date(Date.now() + 86400000),
-          time:  parsedArgs.time || parsedArgs.startTime || null,
-          gcalLink: parsedArgs.link || parsedArgs.htmlLink || null
-        };
-        console.log('[VAPI] Tool call → goCalendar:', ev);
-        setTimeout(()=> goCalendar(ev), 600);
-        return;
-      }
+    // ── 1. TOOL CALL — agent called schedule_meeting ──
+    // This is the ONLY reliable trigger: agent collected all info and called the tool
+    if(msg.type === 'tool-calls' || msg.type === 'function-call'){
+      const toolList = msg.toolCallList || (msg.functionCall ? [{ function: msg.functionCall }] : []);
+      toolList.forEach(tool => {
+        const fnName = (tool.function?.name || '').toLowerCase();
+        console.log('[VAPI TOOL] called:', fnName, 'args:', tool.function?.arguments);
+        if(fnName.includes('schedule') || fnName.includes('meeting') || fnName.includes('calendar') || fnName.includes('event') || fnName.includes('book')){
+          let args = tool.function?.arguments || '{}';
+          if(typeof args === 'string') { try { args = JSON.parse(args); } catch(e){ args = {}; } }
+          console.log('[VAPI TOOL] schedule_meeting args:', args);
+          // Extract date — agent sends YYYY-MM-DD format per its system prompt
+          let eventDate = null;
+          if(args.date){
+            eventDate = new Date(args.date + 'T00:00:00'); // parse YYYY-MM-DD
+            if(isNaN(eventDate.getTime())) eventDate = null;
+          }
+          if(!eventDate) eventDate = new Date(Date.now() + 86400000); // fallback: tomorrow
+          const ev = {
+            title: args.title || args.summary || args.eventName || args.meeting_title || 'Meeting',
+            date:  eventDate,
+            time:  args.time || args.startTime || args.meeting_time || null,
+            gcalLink: args.link || args.htmlLink || null
+          };
+          console.log('[VAPI TOOL] → goCalendar:', ev);
+          showToast('✅ Meeting scheduled!', 2500);
+          setTimeout(()=> goCalendar(ev), 800);
+        }
+      });
+      return;
     }
 
-    // ── Regular transcript ──
+    // ── 2. TOOL CALL RESULT — backend responded ──
+    if(msg.type === 'tool-call-result' || msg.type === 'function-call-result'){
+      console.log('[VAPI TOOL RESULT]', JSON.stringify(msg));
+      // If backend returns event data in result, use that
+      try {
+        const result = typeof msg.result === 'string' ? JSON.parse(msg.result) : msg.result;
+        if(result && (result.date || result.eventDate || result.htmlLink)){
+          const ev = {
+            title:   result.title || result.summary || result.eventName || 'Meeting',
+            date:    result.date ? new Date(result.date) : new Date(Date.now() + 86400000),
+            time:    result.time || result.startTime || null,
+            gcalLink: result.htmlLink || result.link || null
+          };
+          console.log('[VAPI TOOL RESULT] → goCalendar:', ev);
+          showToast('✅ Meeting scheduled!', 2500);
+          setTimeout(()=> goCalendar(ev), 800);
+        }
+      } catch(e) { console.log('[VAPI TOOL RESULT] parse error:', e); }
+      return;
+    }
+
+    // ── 3. TRANSCRIPT — show messages, but DO NOT parse dates here ──
     if(msg.type === "transcript" && msg.transcriptType === "final"){
       showTyping(false);
       addMsg(msg.role === "user" ? "user" : "ai", msg.transcript);
-
-      // Always track what the user says for date extraction fallback
+      // Track user's speech for reference only — no date parsing triggered here
       if(msg.role === "user"){
         lastUserUtterance = msg.transcript;
         console.log('[VAPI] User said:', msg.transcript);
       }
-
       if(msg.role === "assistant"){
         console.log('[VAPI] Assistant said:', msg.transcript);
-        const ev = parseScheduleFromAIResponse(msg.transcript);
-        console.log('[VAPI] parseScheduleFromAIResponse result:', ev);
-        if(ev){
-          setTimeout(()=>{
-            showToast(`✅ "${ev.title}" scheduled!`, 2500);
-            setTimeout(()=> goCalendar(ev), 600);
-          }, 400);
-        }
+        // DO NOT parse dates from assistant messages — it causes false triggers
+        // The tool call (schedule_meeting) is the only calendar trigger
       }
     }
   });
