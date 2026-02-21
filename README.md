@@ -112,8 +112,11 @@ The keyword `MEETING_CONFIRMED` is the **sole trigger** for opening the calendar
 
 
 
-### Calendar View (correct date highlighted)
+### Calendar View  of agent (correct date highlighted)
 <img width="1920" height="1020" alt="image" src="https://github.com/user-attachments/assets/dbc207d7-e356-4701-9d61-cdccacf5b44c" />
+
+### Calender View in google Calender 
+<img width="1920" height="1020" alt="image" src="https://github.com/user-attachments/assets/1aa38c90-e9ad-4796-a906-4bd3009e6714" />
 
 
 ### Console Log Sample
