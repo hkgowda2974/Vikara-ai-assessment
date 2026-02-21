@@ -1457,16 +1457,15 @@ function getAssistantOverrides(){
       model: "nova-2",
       language: "en-IN",
       keywords: [
-        "MEETING_CONFIRMED:5",
-        "schedule_meeting:3",
-        "January:2","February:2","March:2","April:2","May:2","June:2",
-        "July:2","August:2","September:2","October:2","November:2","December:2",
-        "Monday:2","Tuesday:2","Wednesday:2","Thursday:2","Friday:2","Saturday:2","Sunday:2",
-        "tomorrow:2","AM:2","PM:2","IST:2",
-        "meeting:2","appointment:2","schedule:2","calendar:2",
-        "first:1","second:1","third:1","fourth:1","fifth:1",
-        "tenth:1","fifteenth:1","twentieth:1","twenty:1","thirty:1",
-        "Namaste:3","Samay:3"
+        "MEETING_CONFIRMED",
+        "January","February","March","April","May","June",
+        "July","August","September","October","November","December",
+        "Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday",
+        "tomorrow","AM","PM","IST",
+        "meeting","appointment","schedule","calendar",
+        "first","second","third","fourth","fifth",
+        "tenth","fifteenth","twentieth","twenty","thirty",
+        "Namaste","Samay"
       ]
     }
   };
@@ -1485,65 +1484,8 @@ async function startCall(){
       vapi = new VapiClass(PUBLIC_KEY);
       wireVapi();
     }
-    await vapi.start(ASSISTANT_ID, {
-      transcriber: {
-        provider: "deepgram",
-        model: "nova-2",
-        language: "en-IN",
-        keywords: [
-          "MEETING_CONFIRMED:5",
-          "schedule_meeting:3",
-          "January:2","February:2","March:2","April:2","May:2","June:2",
-          "July:2","August:2","September:2","October:2","November:2","December:2",
-          "Monday:2","Tuesday:2","Wednesday:2","Thursday:2","Friday:2","Saturday:2","Sunday:2",
-          "tomorrow:2","AM:2","PM:2","IST:2",
-          "meeting:2","appointment:2","schedule:2","calendar:2",
-          "first:1","second:1","third:1","fourth:1","fifth:1",
-          "tenth:1","fifteenth:1","twentieth:1","twenty:1","thirty:1",
-          "Namaste:3","Samay:3"
-        ]
-      },
-      model: {
-        provider: "openai",
-        model: "gpt-4o",
-        systemPrompt: `You are Samay, a voice scheduling assistant for Indian users. Today's date is {{now}}.
-
-As soon as the conversation starts, greet the user warmly and ask for their name.
-
-Your job:
-1. Ask for the user's name.
-2. Ask for the meeting date. Convert ANY date the user says (like "next Monday", "tomorrow", "February 25th", "25th Feb") to YYYY-MM-DD format before calling the tool. Use today's date ({{now}}) to resolve relative dates.
-3. Ask for the meeting time in IST. Accept any format ("10 AM", "3:30 PM", "ten thirty AM") and convert to 12-hour format with AM/PM (e.g. "10:00 AM", "3:30 PM").
-4. Ask for an optional meeting title. WAIT for the user to reply before moving on. If the user says skip, none, leave blank, or does not give one — use "Meeting" as the title. Do NOT proceed to the tool call until you have received the user's reply to this question.
-5. Once you have name, date, time, AND title — call the tool "schedule_meeting" immediately. Do NOT say the meeting is confirmed before the tool responds successfully.
-
-When calling the tool, send:
-- name: the user's name (string)
-- date: YYYY-MM-DD format only (e.g. "2026-03-15") — NEVER send "next Monday" or relative text
-- time: 12-hour format with AM/PM (e.g. "10:00 AM", "3:30 PM")
-- title: meeting title (string, use "Meeting" if user skips)
-
-CRITICAL RULES:
-- ALWAYS resolve relative dates to YYYY-MM-DD using today's date before calling the tool.
-- NEVER call the tool with a relative date like "next Monday" or "tomorrow".
-- The time must be passed exactly as the user said it in IST. Do NOT convert to UTC.
-- You MUST actually call the tool. Do NOT say "your meeting has been scheduled" without calling it first.
-- Only confirm the meeting AFTER the tool returns a successful response.
-
-When the tool succeeds and you confirm the booking, say EXACTLY this format and nothing else:
-"Your meeting '[TITLE]' is scheduled for [MONTH] [DAY] at [TIME]. MEETING_CONFIRMED"
-
-Example: "Your meeting 'Project Sync' is scheduled for February 26 at 3 PM. MEETING_CONFIRMED"
-
-Rules for the confirmation message:
-- Put the meeting title inside single quotes exactly as given.
-- Say the date as month name + day number (e.g. "February 26", NOT "26th February" or "02/26").
-- Say the time in simple format (e.g. "3 PM", "10:30 AM").
-- End with exactly: MEETING_CONFIRMED
-- Do NOT read out any URLs or links.`
-      }
-    });
-  } catch(e){
+    await vapi.start(ASSISTANT_ID);
+    } catch(e){
     showToast("⚠ " + (e.message || "Could not connect"));
     goIdle();
   }
@@ -1569,21 +1511,8 @@ async function startCallWithMessage(text){
       vapi = new VapiClass(PUBLIC_KEY);
       wireVapi();
     }
-        await vapi.start(ASSISTANT_ID, {
-      transcriber: {
-        provider: "deepgram",
-        model: "nova-2",
-        language: "en-IN",
-        keywords: [
-          "MEETING_CONFIRMED:5","schedule_meeting:3",
-          "January:2","February:2","March:2","April:2","May:2","June:2",
-          "July:2","August:2","September:2","October:2","November:2","December:2",
-          "Monday:2","Tuesday:2","Wednesday:2","Thursday:2","Friday:2","Saturday:2","Sunday:2",
-          "tomorrow:2","AM:2","PM:2","IST:2","meeting:2","appointment:2","Namaste:3","Samay:3"
-        ]
-      }
-    });
-  } catch(e){
+    await vapi.start(ASSISTANT_ID);
+    } catch(e){
     showToast("⚠ " + (e.message || "Could not connect"));
     pendingInitialText = null;
     // Fallback to local text handling
