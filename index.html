@@ -883,6 +883,66 @@ function parseDateFromText(text){
     }
   }
 
+  // ── Bare day number / ordinal / cardinal (no month given) ─────────────────
+  // Handles: "fourth", "four", "twenty four", "twenty fourth", "4", "24", "4th"
+  // Strategy: try every word/phrase in the text as a day number.
+  // Only accept 1-31 range. Resolve to next occurrence of that day-of-month.
+  const bareOrdinals = {
+    first:1, second:2, third:3, fourth:4, fifth:5, sixth:6, seventh:7, eighth:8,
+    ninth:9, tenth:10, eleventh:11, twelfth:12, thirteenth:13, fourteenth:14,
+    fifteenth:15, sixteenth:16, seventeenth:17, eighteenth:18, nineteenth:19,
+    twentieth:20, thirtieth:30,
+    'twenty first':21, 'twenty second':22, 'twenty third':23, 'twenty fourth':24,
+    'twenty fifth':25, 'twenty sixth':26, 'twenty seventh':27, 'twenty eighth':28,
+    'twenty ninth':29, 'thirty first':31,
+    one:1, two:2, three:3, four:4, five:5, six:6, seven:7, eight:8,
+    nine:9, ten:10, eleven:11, twelve:12, thirteen:13, fourteen:14,
+    fifteen:15, sixteen:16, seventeen:17, eighteen:18, nineteen:19,
+    twenty:20, thirty:30,
+    'twenty one':21, 'twenty two':22, 'twenty three':23, 'twenty four':24,
+    'twenty five':25, 'twenty six':26, 'twenty seven':27, 'twenty eight':28,
+    'twenty nine':29, 'thirty one':31
+  };
+
+  // Strip filler words that are NOT date-related before bare-day check
+  const stripped = lower
+    .replace(/\b(the|of|on|date|day|is|it|meeting|schedule|book|set|up|please|can|you|i|want|a|an|my)\b/gi, ' ')
+    .replace(/\s+/g, ' ').trim();
+
+  // Try compound two-word forms first (e.g. "twenty four")
+  const twoWord = stripped.match(/\b(twenty|thirty)\s+(one|two|three|four|five|six|seven|eight|nine|first|second|third|fourth|fifth|sixth|seventh|eighth|ninth)\b/);
+  if(twoWord){
+    const key = twoWord[0].replace(/\s+/g,' ').trim();
+    const day = bareOrdinals[key];
+    if(day !== undefined){
+      let d = new Date(today.getFullYear(), today.getMonth(), day);
+      if(d <= today){ d.setMonth(d.getMonth()+1); }
+      return d;
+    }
+  }
+
+  // Try single-word ordinals/cardinals (e.g. "fourth", "four", "twenty", "thirty")
+  const singleWord = stripped.match(/\b(first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth|eleventh|twelfth|thirteenth|fourteenth|fifteenth|sixteenth|seventeenth|eighteenth|nineteenth|twentieth|thirtieth|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty)\b/);
+  if(singleWord){
+    const day = bareOrdinals[singleWord[1]];
+    if(day !== undefined && day >= 1 && day <= 31){
+      let d = new Date(today.getFullYear(), today.getMonth(), day);
+      if(d <= today){ d.setMonth(d.getMonth()+1); }
+      return d;
+    }
+  }
+
+  // Try bare numeric day (e.g. "4", "24", "4th", "24th")
+  const bareNum = stripped.match(/\b(\d{1,2})(st|nd|rd|th)?\b/);
+  if(bareNum){
+    const day = parseInt(bareNum[1]);
+    if(day >= 1 && day <= 31){
+      let d = new Date(today.getFullYear(), today.getMonth(), day);
+      if(d <= today){ d.setMonth(d.getMonth()+1); }
+      return d;
+    }
+  }
+
   return null;
 }
 
@@ -1272,29 +1332,20 @@ function wireVapi(){
     }
 
     /* ── 2. TOOL CALL RESULT ── */
+    // NOTE: Do NOT call goCalendar() here. The tool result arrives before the assistant
+    // speaks the confirmation. We wait for MEETING_CONFIRMED in the transcript instead.
+    // If the result contains a gcalLink or enriched data, merge it into pendingEvent.
     if(msg.type === 'tool-call-result' || msg.type === 'function-call-result'){
       console.log('[VAPI TOOL RESULT]', JSON.stringify(msg));
       try{
         const result = typeof msg.result === 'string' ? JSON.parse(msg.result) : msg.result;
-        if(result && (result.date || result.eventDate || result.htmlLink)){
-          const rawDate = result.date || result.eventDate;
-          let evDate = null;
-          if(rawDate){
-            evDate = /^\d{4}-\d{2}-\d{2}$/.test(rawDate.trim())
-              ? (([y,mo,dy]) => new Date(y, mo-1, dy))(rawDate.trim().split('-').map(Number))
-              : parseDateFromText(rawDate) || new Date(rawDate);
-          }
-          if(!evDate || isNaN(evDate.getTime())) evDate = new Date(Date.now() + 86400000);
-
-          const ev = {
-            title:    result.title || result.summary || result.eventName || 'Meeting',
-            date:     evDate,
-            time:     result.time || result.startTime || null,
-            gcalLink: result.htmlLink || result.link  || null
-          };
-          console.log('[VAPI TOOL RESULT] → goCalendar:', ev);
-          showToast('✅ Meeting scheduled!', 2500);
-          setTimeout(() => goCalendar(ev, 'tool-result'), 800);
+        if(result && pendingEvent){
+          // Merge any richer data from the tool result into pendingEvent
+          if(result.htmlLink || result.link)
+            pendingEvent.gcalLink = result.htmlLink || result.link;
+          if((result.title || result.summary) && (!pendingEvent.title || pendingEvent.title === 'Meeting'))
+            pendingEvent.title = result.title || result.summary || pendingEvent.title;
+          console.log('[VAPI TOOL RESULT] merged into pendingEvent:', JSON.stringify(pendingEvent));
         }
       } catch(e){ console.log('[VAPI TOOL RESULT] parse error:', e); }
       return;
@@ -1317,46 +1368,69 @@ function wireVapi(){
         assistantBuffer += ' ' + text;
 
         if(/meeting[\s_-]?confirmed/i.test(text)){
-          console.log('[VAPI] ✅ MEETING_CONFIRMED detected');
+          console.log('[VAPI] ✅ MEETING_CONFIRMED detected | pendingEvent:', JSON.stringify(pendingEvent));
           let ev;
+          const source = pendingEvent ? 'tool-call' : 'speech-parse';
 
           if(pendingEvent){
+            // ── Happy path: tool call gave us clean structured data ──
             ev = { ...pendingEvent };
+            // Always prefer the title from the confirmation sentence (single quotes),
+            // since the tool may have been called before the user gave the title.
+            const quotedInConfirm = text.match(/['\u2018]([^'\u2019]+)['\u2019]/);
+            if(quotedInConfirm && quotedInConfirm[1].trim()){
+              ev.title = quotedInConfirm[1].trim();
+              console.log('[VAPI] Title updated from confirmation quotes:', ev.title);
+            }
+
           } else {
-            // Date: user speech first, then full assistant buffer
-            let eventDate = parseDateFromText(allUserSpeech);
+            // ── Fallback: parse from the clean confirmation sentence ──
+            // The assistant always says: "Your meeting 'Title' is scheduled for February 26 at 3 PM. MEETING_CONFIRMED"
+
+            // 1. Title: extract from single quotes in the confirmation sentence
+            let title = 'Meeting';
+            const quotedTitle = text.match(/['']([^'']+)['']/);
+            if(quotedTitle){
+              title = quotedTitle[1].trim();
+              console.log('[VAPI] Title from quotes:', title);
+            } else {
+              // Fallback: scan user utterances newest-first
+              const isDateWord = /(january|february|march|april|may|june|july|august|september|october|november|december|monday|tuesday|wednesday|thursday|friday|saturday|sunday|tomorrow|today|next|twenty|thirty|first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth|\d)/i;
+              const isTimeWord = /^[\s]*(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|\d{1,2})[\s:]*(am|pm|ist)[.!?,\s]*$/i;
+              const isFiller   = /^(yes|yeah|no|nope|okay|ok|sure|thanks|thank|thank you|hello|hi|hey|namaste|please|proceed|blank|leave|skip|none|no title|am|pm|online|offline|virtual|done|scheduled|confirmed|yep|yup|alright|right|correct|sounds good|good|great|perfect|fine|understood|gotcha)[.!?,\s]*$/i;
+              const isOnlyDigits = /^[\d\s\-\/\.]+$/;
+              for(const utt of [...userUtterances].reverse()){
+                const u = utt.trim().replace(/[.!?,]+$/, '').trim();
+                if(u.length < 2)       continue;
+                if(isFiller.test(u))   continue;
+                if(isTimeWord.test(u)) continue;
+                if(isOnlyDigits.test(u)) continue;
+                if(isDateWord.test(u) && u.split(/\s+/).length <= 3) continue;
+                if(/\b(am|pm)\s*$/i.test(u) && u.split(/\s+/).length <= 3) continue;
+                title = u.charAt(0).toUpperCase() + u.slice(1);
+                break;
+              }
+            }
+
+            // 2. Date: parse from confirmation sentence (clean format: "February 26")
+            //    then fall back to user speech, then assistantBuffer
+            let eventDate = parseDateFromText(text);
+            if(!eventDate) eventDate = parseDateFromText(allUserSpeech);
             if(!eventDate) eventDate = parseDateFromText(assistantBuffer);
             if(!eventDate) eventDate = new Date(Date.now() + 86400000);
 
-            // Time: user speech first, then assistant buffer
-            let time = parseSpokenTime(allUserSpeech);
+            // 3. Time: parse from confirmation sentence (clean format: "at 3 PM")
+            //    then fall back to user speech
+            let time = parseSpokenTime(text);
+            if(!time) time = parseSpokenTime(allUserSpeech);
             if(!time) time = parseSpokenTime(assistantBuffer);
-
-            // Title: scan user utterances newest-first, skip fillers/dates/times
-            const isDateWord = /(january|february|march|april|may|june|july|august|september|october|november|december|monday|tuesday|wednesday|thursday|friday|saturday|sunday|tomorrow|today|next|twenty|thirty|first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth|\d)/i;
-            const isTimeWord = /^[\s]*(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|\d{1,2})[\s:]*(am|pm|ist)[.!?,\s]*$/i;
-            const isFiller   = /^(yes|yeah|no|nope|okay|ok|sure|thanks|thank|thank you|hello|hi|hey|namaste|please|proceed|blank|leave|skip|none|no title|am|pm|online|offline|virtual|done|scheduled|confirmed|yep|yup|alright|right|correct|sounds good|good|great|perfect|fine|understood|gotcha)[.!?,\s]*$/i;
-            const isOnlyDigits = /^[\d\s\-\/\.]+$/;
-
-            let title = 'Meeting';
-            for(const utt of [...userUtterances].reverse()){
-              const u = utt.trim().replace(/[.!?,]+$/, '').trim();
-              if(u.length < 2)           continue;
-              if(isFiller.test(u))       continue;
-              if(isTimeWord.test(u))     continue;
-              if(isOnlyDigits.test(u))   continue;
-              if(isDateWord.test(u) && u.split(/\s+/).length <= 3) continue;
-              if(/\b(am|pm)\s*$/i.test(u) && u.split(/\s+/).length <= 3) continue;
-              title = u.charAt(0).toUpperCase() + u.slice(1);
-              break;
-            }
 
             ev = { title, date: eventDate, time, gcalLink: null };
           }
 
-          console.log('[VAPI] → goCalendar:', ev);
+          console.log('[VAPI] → goCalendar:', ev, '| source:', source);
           showToast('✅ Meeting scheduled!', 2000);
-          setTimeout(() => goCalendar(ev, pendingEvent ? 'tool-call' : 'speech-parse'), 500);
+          setTimeout(() => goCalendar(ev, source), 500);
 
           pendingEvent    = null;
           assistantBuffer = '';
@@ -1373,6 +1447,32 @@ function wireVapi(){
 }
 
 /* ════════════════════════════════════════════════════════
+   VAPI — ASSISTANT OVERRIDES (system prompt + transcriber)
+   Shared by both voice and text-initiated calls.
+════════════════════════════════════════════════════════ */
+function getAssistantOverrides(){
+  return {
+    transcriber: {
+      provider: "deepgram",
+      model: "nova-2",
+      language: "en-IN",
+      keywords: [
+        "MEETING_CONFIRMED:5",
+        "schedule_meeting:3",
+        "January:2","February:2","March:2","April:2","May:2","June:2",
+        "July:2","August:2","September:2","October:2","November:2","December:2",
+        "Monday:2","Tuesday:2","Wednesday:2","Thursday:2","Friday:2","Saturday:2","Sunday:2",
+        "tomorrow:2","AM:2","PM:2","IST:2",
+        "meeting:2","appointment:2","schedule:2","calendar:2",
+        "first:1","second:1","third:1","fourth:1","fifth:1",
+        "tenth:1","fifteenth:1","twentieth:1","twenty:1","thirty:1",
+        "Namaste:3","Samay:3"
+      ]
+    }
+  };
+}
+
+/* ════════════════════════════════════════════════════════
    VAPI — START CALL (voice mode, from call button)
 ════════════════════════════════════════════════════════ */
 async function startCall(){
@@ -1385,7 +1485,64 @@ async function startCall(){
       vapi = new VapiClass(PUBLIC_KEY);
       wireVapi();
     }
-    await vapi.start(ASSISTANT_ID);
+    await vapi.start(ASSISTANT_ID, {
+      transcriber: {
+        provider: "deepgram",
+        model: "nova-2",
+        language: "en-IN",
+        keywords: [
+          "MEETING_CONFIRMED:5",
+          "schedule_meeting:3",
+          "January:2","February:2","March:2","April:2","May:2","June:2",
+          "July:2","August:2","September:2","October:2","November:2","December:2",
+          "Monday:2","Tuesday:2","Wednesday:2","Thursday:2","Friday:2","Saturday:2","Sunday:2",
+          "tomorrow:2","AM:2","PM:2","IST:2",
+          "meeting:2","appointment:2","schedule:2","calendar:2",
+          "first:1","second:1","third:1","fourth:1","fifth:1",
+          "tenth:1","fifteenth:1","twentieth:1","twenty:1","thirty:1",
+          "Namaste:3","Samay:3"
+        ]
+      },
+      model: {
+        provider: "openai",
+        model: "gpt-4o",
+        systemPrompt: `You are Samay, a voice scheduling assistant for Indian users. Today's date is {{now}}.
+
+As soon as the conversation starts, greet the user warmly and ask for their name.
+
+Your job:
+1. Ask for the user's name.
+2. Ask for the meeting date. Convert ANY date the user says (like "next Monday", "tomorrow", "February 25th", "25th Feb") to YYYY-MM-DD format before calling the tool. Use today's date ({{now}}) to resolve relative dates.
+3. Ask for the meeting time in IST. Accept any format ("10 AM", "3:30 PM", "ten thirty AM") and convert to 12-hour format with AM/PM (e.g. "10:00 AM", "3:30 PM").
+4. Ask for an optional meeting title. WAIT for the user to reply before moving on. If the user says skip, none, leave blank, or does not give one — use "Meeting" as the title. Do NOT proceed to the tool call until you have received the user's reply to this question.
+5. Once you have name, date, time, AND title — call the tool "schedule_meeting" immediately. Do NOT say the meeting is confirmed before the tool responds successfully.
+
+When calling the tool, send:
+- name: the user's name (string)
+- date: YYYY-MM-DD format only (e.g. "2026-03-15") — NEVER send "next Monday" or relative text
+- time: 12-hour format with AM/PM (e.g. "10:00 AM", "3:30 PM")
+- title: meeting title (string, use "Meeting" if user skips)
+
+CRITICAL RULES:
+- ALWAYS resolve relative dates to YYYY-MM-DD using today's date before calling the tool.
+- NEVER call the tool with a relative date like "next Monday" or "tomorrow".
+- The time must be passed exactly as the user said it in IST. Do NOT convert to UTC.
+- You MUST actually call the tool. Do NOT say "your meeting has been scheduled" without calling it first.
+- Only confirm the meeting AFTER the tool returns a successful response.
+
+When the tool succeeds and you confirm the booking, say EXACTLY this format and nothing else:
+"Your meeting '[TITLE]' is scheduled for [MONTH] [DAY] at [TIME]. MEETING_CONFIRMED"
+
+Example: "Your meeting 'Project Sync' is scheduled for February 26 at 3 PM. MEETING_CONFIRMED"
+
+Rules for the confirmation message:
+- Put the meeting title inside single quotes exactly as given.
+- Say the date as month name + day number (e.g. "February 26", NOT "26th February" or "02/26").
+- Say the time in simple format (e.g. "3 PM", "10:30 AM").
+- End with exactly: MEETING_CONFIRMED
+- Do NOT read out any URLs or links.`
+      }
+    });
   } catch(e){
     showToast("⚠ " + (e.message || "Could not connect"));
     goIdle();
@@ -1412,7 +1569,20 @@ async function startCallWithMessage(text){
       vapi = new VapiClass(PUBLIC_KEY);
       wireVapi();
     }
-    await vapi.start(ASSISTANT_ID);
+        await vapi.start(ASSISTANT_ID, {
+      transcriber: {
+        provider: "deepgram",
+        model: "nova-2",
+        language: "en-IN",
+        keywords: [
+          "MEETING_CONFIRMED:5","schedule_meeting:3",
+          "January:2","February:2","March:2","April:2","May:2","June:2",
+          "July:2","August:2","September:2","October:2","November:2","December:2",
+          "Monday:2","Tuesday:2","Wednesday:2","Thursday:2","Friday:2","Saturday:2","Sunday:2",
+          "tomorrow:2","AM:2","PM:2","IST:2","meeting:2","appointment:2","Namaste:3","Samay:3"
+        ]
+      }
+    });
   } catch(e){
     showToast("⚠ " + (e.message || "Could not connect"));
     pendingInitialText = null;
