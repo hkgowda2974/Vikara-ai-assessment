@@ -612,6 +612,20 @@ function typeWrite(text, speed=14){
 }
 
 /* ════════════════════════════════════════════════════════
+   SPOKEN DIGIT SEQUENCE → NUMBER
+   e.g. "two zero two six" → 2026, "zero three" → 3, "zero two" → 2
+   Used to parse dates spoken digit-by-digit by TTS/ASR.
+════════════════════════════════════════════════════════ */
+const DIGIT_WORD = { zero:0, one:1, two:2, three:3, four:4, five:5, six:6, seven:7, eight:8, nine:9 };
+
+function spokenDigitsToInt(words){
+  // words: array of lowercase strings, all must be digit words
+  if(!words.length) return NaN;
+  if(!words.every(w => DIGIT_WORD[w] !== undefined)) return NaN;
+  return parseInt(words.map(w => DIGIT_WORD[w]).join(''));
+}
+
+/* ════════════════════════════════════════════════════════
    SPOKEN NUMBER → INTEGER
    Handles ordinals, cardinals, compounds, and digit strings.
 ════════════════════════════════════════════════════════ */
@@ -656,6 +670,73 @@ function spokenToNum(str){
 }
 
 /* ════════════════════════════════════════════════════════
+   PARSE SPOKEN DIGIT DATE
+   Handles TTS-read dates like "two zero two six zero three zero two"
+   which represents 2026-03-02.
+   Strategy: scan for runs of digit-words and try to interpret as
+   YYYYMMDD, YYYYMDD, YYYYMD, MMDD, etc.
+════════════════════════════════════════════════════════ */
+function parseSpokenDigitDate(text){
+  if(!text) return null;
+  const lower = text.toLowerCase();
+  const words = lower.split(/\s+/);
+  const today = todayMidnight();
+
+  // Find all maximal consecutive runs of digit-words
+  const runs = [];
+  let run = [];
+  for(const w of words){
+    if(DIGIT_WORD[w] !== undefined){ run.push(w); }
+    else { if(run.length >= 2) runs.push([...run]); run = []; }
+  }
+  if(run.length >= 2) runs.push(run);
+
+  for(const r of runs){
+    const digits = r.map(w => DIGIT_WORD[w]);
+    const str    = digits.join('');
+
+    // Try YYYYMMDD (8 digits)
+    if(str.length === 8){
+      const y = parseInt(str.slice(0,4)), mo = parseInt(str.slice(4,6)), d = parseInt(str.slice(6,8));
+      if(y >= 2020 && mo >= 1 && mo <= 12 && d >= 1 && d <= 31){
+        return new Date(y, mo-1, d);
+      }
+    }
+    // Try YYYYMDD or YYYYMD (7 digits) — year is always first 4
+    if(str.length === 7){
+      const y = parseInt(str.slice(0,4));
+      if(y >= 2020){
+        // Try mo=1digit, d=2digit
+        const mo1 = parseInt(str.slice(4,5)), d1 = parseInt(str.slice(5,7));
+        if(mo1 >= 1 && mo1 <= 12 && d1 >= 1 && d1 <= 31) return new Date(y, mo1-1, d1);
+        // Try mo=2digit, d=1digit
+        const mo2 = parseInt(str.slice(4,6)), d2 = parseInt(str.slice(6,7));
+        if(mo2 >= 1 && mo2 <= 12 && d2 >= 1 && d2 <= 9) return new Date(y, mo2-1, d2);
+      }
+    }
+    // Try YYYYMD (6 digits, single-digit month and day)
+    if(str.length === 6){
+      const y = parseInt(str.slice(0,4));
+      if(y >= 2020){
+        const mo = parseInt(str.slice(4,5)), d = parseInt(str.slice(5,6));
+        if(mo >= 1 && mo <= 12 && d >= 1 && d <= 9) return new Date(y, mo-1, d);
+      }
+      // Could also be MMDDYY — skip, too ambiguous
+    }
+    // Try MMDD (4 digits)
+    if(str.length === 4){
+      const mo = parseInt(str.slice(0,2)), d = parseInt(str.slice(2,4));
+      if(mo >= 1 && mo <= 12 && d >= 1 && d <= 31){
+        let date = new Date(today.getFullYear(), mo-1, d);
+        if(date < today) date.setFullYear(today.getFullYear()+1);
+        return date;
+      }
+    }
+  }
+  return null;
+}
+
+/* ════════════════════════════════════════════════════════
    TODAY MIDNIGHT
 ════════════════════════════════════════════════════════ */
 function todayMidnight(){
@@ -685,6 +766,10 @@ function parseDateFromText(text){
 
   const today = todayMidnight();
   const lower = text.toLowerCase().replace(/,/g,'');
+
+  // ── Try spoken digit sequence first (e.g. "two zero two six zero three zero two" → 2026-03-02)
+  const digitDate = parseSpokenDigitDate(lower);
+  if(digitDate) return digitDate;
 
   // ── Relative keywords ──────────────────────────────────
   if(/\bday after tomorrow\b/.test(lower)){
@@ -1238,24 +1323,30 @@ function wireVapi(){
           if(pendingEvent){
             ev = { ...pendingEvent };
           } else {
+            // Date: user speech first, then full assistant buffer
             let eventDate = parseDateFromText(allUserSpeech);
             if(!eventDate) eventDate = parseDateFromText(assistantBuffer);
             if(!eventDate) eventDate = new Date(Date.now() + 86400000);
 
+            // Time: user speech first, then assistant buffer
             let time = parseSpokenTime(allUserSpeech);
             if(!time) time = parseSpokenTime(assistantBuffer);
 
+            // Title: scan user utterances newest-first, skip fillers/dates/times
             const isDateWord = /(january|february|march|april|may|june|july|august|september|october|november|december|monday|tuesday|wednesday|thursday|friday|saturday|sunday|tomorrow|today|next|twenty|thirty|first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth|\d)/i;
-            const isTimeWord = /(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|\d)\s*(am|pm|ist)/i;
-            const isFiller   = /^(yes|no|okay|ok|sure|thanks|thank|hello|hi|namaste|please|proceed|blank|leave|skip|none|no title|am|pm)[.!?,]*$/i;
+            const isTimeWord = /^[\s]*(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|\d{1,2})[\s:]*(am|pm|ist)[.!?,\s]*$/i;
+            const isFiller   = /^(yes|yeah|no|nope|okay|ok|sure|thanks|thank|thank you|hello|hi|hey|namaste|please|proceed|blank|leave|skip|none|no title|am|pm|online|offline|virtual|done|scheduled|confirmed|yep|yup|alright|right|correct|sounds good|good|great|perfect|fine|understood|gotcha)[.!?,\s]*$/i;
+            const isOnlyDigits = /^[\d\s\-\/\.]+$/;
 
             let title = 'Meeting';
             for(const utt of [...userUtterances].reverse()){
-              const u = utt.trim().replace(/[.!?,]+$/, '');
-              if(u.length < 2)       continue;
-              if(isFiller.test(u))   continue;
-              if(isTimeWord.test(u)) continue;
-              if(isDateWord.test(u)) continue;
+              const u = utt.trim().replace(/[.!?,]+$/, '').trim();
+              if(u.length < 2)           continue;
+              if(isFiller.test(u))       continue;
+              if(isTimeWord.test(u))     continue;
+              if(isOnlyDigits.test(u))   continue;
+              if(isDateWord.test(u) && u.split(/\s+/).length <= 3) continue;
+              if(/\b(am|pm)\s*$/i.test(u) && u.split(/\s+/).length <= 3) continue;
               title = u.charAt(0).toUpperCase() + u.slice(1);
               break;
             }
