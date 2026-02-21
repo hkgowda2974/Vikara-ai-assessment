@@ -465,17 +465,21 @@ const CALENDAR_EMAIL = '1mp22cs021@gmail.com';
 /* ════════════════════════════════════════════════════════
    STATE
 ════════════════════════════════════════════════════════ */
-let vapi              = null;   // FIX 4: single Vapi instance, never nulled after creation
+let vapi              = null;
 let VapiClass         = null;
-let vapiWired         = false;  // FIX 4: ensure wireVapi() runs exactly once
+let vapiWired         = false;
 let appState          = 'idle';
 let scheduledEvent    = null;
 let calYear           = new Date().getFullYear();
 let calMonth          = new Date().getMonth();
-let pendingEvent      = null;   // set by tool-call handler; used at MEETING_CONFIRMED
-let assistantBuffer   = '';     // accumulates all assistant speech this call
-let allUserSpeech     = '';     // accumulates all user speech this call
-let userUtterances    = [];     // individual user turns this call
+let pendingEvent      = null;
+let assistantBuffer   = '';
+let allUserSpeech     = '';
+let userUtterances    = [];
+// FIX: track if current session is voice or text
+let isVoiceMode       = false;
+// FIX: track pending initial text message to send after call connects
+let pendingInitialText = null;
 
 /* ════════════════════════════════════════════════════════
    DOM REFS
@@ -528,18 +532,19 @@ function setState(s){
   if(s === 'connecting') scene.classList.add('connecting');
   if(s === 'active')     scene.classList.add('active');
   if(s === 'calendar')   scene.classList.add('calendar');
-  console.log('[SAMAY] state →', s, '| scene classes:', scene.className);
+  console.log('[SAMAY] state →', s);
 }
 
-function goConnecting(){ connLabel.textContent = 'Connecting…'; setState('connecting'); }
+function goConnecting(msg){ connLabel.textContent = msg || 'Connecting…'; setState('connecting'); }
 function goActive(){ setState('active'); setTimeout(() => activeInput.focus(), 680); }
 
-/* FIX 4: goIdle() no longer sets vapi = null so we reuse the same instance */
 function goIdle(){
   setState('idle');
   Array.from(transcript.children).forEach(c => { if(c !== typing) c.remove(); });
   typing.classList.remove("show");
   activeInput.value = "";
+  isVoiceMode = false;
+  pendingInitialText = null;
 }
 
 function showDebug(ev, source){
@@ -547,7 +552,6 @@ function showDebug(ev, source){
   const d = ev.date;
   const dateStr = d ? `${d.getFullYear()}/${pad(d.getMonth()+1)}/${pad(d.getDate())}` : '??';
   const url = `https://calendar.google.com/calendar/r/day/${dateStr}?authuser=${encodeURIComponent(CALENDAR_EMAIL)}`;
-
   document.getElementById('db-title').textContent  = ev.title || '(empty)';
   document.getElementById('db-title').className    = 'db-val ' + (ev.title && ev.title !== 'Meeting' ? 'db-ok' : 'db-warn');
   document.getElementById('db-date').textContent   = d ? d.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric',year:'numeric'}) : '(none)';
@@ -559,7 +563,6 @@ function showDebug(ev, source){
   document.getElementById('db-url').textContent    = url;
   document.getElementById('db-account').textContent = `authuser=${CALENDAR_EMAIL} (auto)`;
   document.getElementById('db-account').className  = 'db-val db-ok';
-
   document.getElementById('debugOverlay').classList.add('show');
   console.log('[DEBUG] title:', ev.title, '| date:', dateStr, '| time:', ev.time, '| source:', source, '| url:', url);
 }
@@ -610,8 +613,7 @@ function typeWrite(text, speed=14){
 
 /* ════════════════════════════════════════════════════════
    SPOKEN NUMBER → INTEGER
-   FIX 1a: compOrdinals table covers BOTH ordinal and cardinal forms,
-   e.g. "twenty eighth" AND "twenty eight" both → 28.
+   Handles ordinals, cardinals, compounds, and digit strings.
 ════════════════════════════════════════════════════════ */
 function spokenToNum(str){
   if(!str) return NaN;
@@ -628,7 +630,6 @@ function spokenToNum(str){
   };
   const tens = { twenty:20, thirty:30, twentieth:20, thirtieth:30 };
 
-  // Both cardinal and ordinal compound forms
   const compounds = {
     'twenty one':21,   'twenty first':21,
     'twenty two':22,   'twenty second':22,
@@ -646,7 +647,6 @@ function spokenToNum(str){
   if(tens[str]      !== undefined) return tens[str];
   if(compounds[str] !== undefined) return compounds[str];
 
-  // Generic tens+ones fallback
   const parts = str.split(' ');
   if(parts.length === 2){
     const t = tens[parts[0]], o = ones[parts[1]];
@@ -665,12 +665,13 @@ function todayMidnight(){
 }
 
 /* ════════════════════════════════════════════════════════
-   DATE PARSER
-   FIX 1b: Call spokenToNum on the RAW dayStr FIRST before stripping
-   any ordinal suffix. This prevents "twenty eighth" being clipped to
-   "eight" (→8) by a naive suffix-strip.
-   Uses the LAST month+day match in text so example phrases in the
-   assistant's prompt can't shadow the real date the user gave.
+   DATE PARSER — supports ALL formats:
+   • "March 15", "15 March", "15th March", "March 15th"
+   • "twenty eighth February", "Feb twenty-eight"
+   • "3/15", "15/3", "03-15", "2025-03-15", "15.3.2025"
+   • "tomorrow", "today", "next week", "next Monday"
+   • "Monday", "Tuesday" etc (next occurrence)
+   • "15" alone (nearest future that day-of-month)
 ════════════════════════════════════════════════════════ */
 function parseDateFromText(text){
   if(!text) return null;
@@ -683,8 +684,83 @@ function parseDateFromText(text){
   };
 
   const today = todayMidnight();
-  const lower = text.toLowerCase();
+  const lower = text.toLowerCase().replace(/,/g,'');
 
+  // ── Relative keywords ──────────────────────────────────
+  if(/\bday after tomorrow\b/.test(lower)){
+    const d = new Date(today); d.setDate(d.getDate()+2); return d;
+  }
+  if(/\btomorrow\b/.test(lower)){
+    const d = new Date(today); d.setDate(d.getDate()+1); return d;
+  }
+  if(/\btoday\b/.test(lower)) return new Date(today);
+
+  // ── "next <weekday>" ───────────────────────────────────
+  const weekdays = { sunday:0,monday:1,tuesday:2,wednesday:3,thursday:4,friday:5,saturday:6,
+                     sun:0,mon:1,tue:2,wed:3,thu:4,fri:5,sat:6 };
+  const nextWd = lower.match(/\bnext\s+(sunday|monday|tuesday|wednesday|thursday|friday|saturday|sun|mon|tue|wed|thu|fri|sat)\b/);
+  if(nextWd){
+    const target = weekdays[nextWd[1]];
+    const d = new Date(today);
+    let diff = target - d.getDay();
+    if(diff <= 0) diff += 7;
+    diff += 7; // "next" means the one after this coming week
+    d.setDate(d.getDate() + diff);
+    return d;
+  }
+
+  // ── "this <weekday>" or just "<weekday>" ───────────────
+  const thisWd = lower.match(/\b(?:this\s+)?(sunday|monday|tuesday|wednesday|thursday|friday|saturday)\b/);
+  if(thisWd){
+    const target = weekdays[thisWd[1]];
+    const d = new Date(today);
+    let diff = target - d.getDay();
+    if(diff <= 0) diff += 7;
+    d.setDate(d.getDate() + diff);
+    return d;
+  }
+
+  // ── "next week" ────────────────────────────────────────
+  if(/\bnext\s+week\b/.test(lower)){
+    const d = new Date(today); d.setDate(d.getDate()+7); return d;
+  }
+
+  // ── ISO / numeric formats ──────────────────────────────
+  // YYYY-MM-DD or YYYY/MM/DD
+  const iso = lower.match(/\b(\d{4})[-\/](\d{1,2})[-\/](\d{1,2})\b/);
+  if(iso){
+    const d = new Date(parseInt(iso[1]), parseInt(iso[2])-1, parseInt(iso[3]));
+    if(!isNaN(d.getTime())) return d;
+  }
+
+  // DD-MM-YYYY or MM-DD-YYYY heuristic (day > 12 means it's DD first)
+  const dmy = lower.match(/\b(\d{1,2})[-\/\.](\d{1,2})[-\/\.](\d{4})\b/);
+  if(dmy){
+    let [,a,b,y] = dmy.map(Number);
+    const year = dmy[3]; // keep string for year
+    const aNum = parseInt(dmy[1]), bNum = parseInt(dmy[2]), yNum = parseInt(dmy[3]);
+    let month, day;
+    if(aNum > 12){ day = aNum; month = bNum; }
+    else { month = aNum; day = bNum; } // assume MM/DD
+    const d = new Date(yNum, month-1, day);
+    if(!isNaN(d.getTime())) return d;
+  }
+
+  // MM/DD or DD/MM (no year) — prefer MM/DD if ambiguous
+  const mdd = lower.match(/\b(\d{1,2})\/(\d{1,2})\b/);
+  if(mdd){
+    const a = parseInt(mdd[1]), b = parseInt(mdd[2]);
+    let month, day;
+    if(a > 12){ day=a; month=b; }
+    else { month=a; day=b; }
+    if(month>=1 && month<=12 && day>=1 && day<=31){
+      let d = new Date(today.getFullYear(), month-1, day);
+      if(d < today) d.setFullYear(today.getFullYear()+1);
+      return d;
+    }
+  }
+
+  // ── Spoken / written month+day patterns ───────────────
   const spokenDay =
     '(?:twenty|thirty)[- ](?:first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|one|two|three|four|five|six|seven|eight|nine)' +
     '|thirty[- ](?:first|one)' +
@@ -711,7 +787,6 @@ function parseDateFromText(text){
     const mIdx   = months[lastMatch.mStr.toLowerCase().replace(/\./g,'')];
     const rawDay = lastMatch.dayStr.toLowerCase().trim();
 
-    // FIX 1b: try spokenToNum on raw string first (handles "twenty eighth" → 28)
     let day = spokenToNum(rawDay);
     if(isNaN(day)) day = spokenToNum(rawDay.replace(/(st|nd|rd|th)$/, '').trim());
     if(isNaN(day)) day = parseInt(rawDay);
@@ -723,48 +798,111 @@ function parseDateFromText(text){
     }
   }
 
-  if(lower.includes('tomorrow'))  { const d = new Date(today); d.setDate(today.getDate()+1); return d; }
-  if(lower.includes('next week')) { const d = new Date(today); d.setDate(today.getDate()+7); return d; }
-  if(lower.includes('today'))     { return new Date(today); }
-
   return null;
 }
 
 /* ════════════════════════════════════════════════════════
-   TIME PARSER
-   Handles "ten thirty AM", "three thirty PM", "9 am", "10:30 am", etc.
+   TIME PARSER — supports ALL formats:
+   • "10:30 AM", "22:30", "10.30 am"
+   • "ten thirty AM", "three PM"
+   • "half past three", "quarter past two", "quarter to five"
+   • "noon", "midnight"
+   • "at 3", "at 15" (24h bare hour)
+   • IST, UTC offsets ignored (just extract local time)
 ════════════════════════════════════════════════════════ */
 function parseSpokenTime(text){
   if(!text) return null;
-  const lower = text.toLowerCase();
+  const lower = text.toLowerCase().trim();
 
-  // Numeric "10:30 am"
-  const numMatch = lower.match(/\b(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b/);
-  if(numMatch) return numMatch[1] + ':' + (numMatch[2]||'00') + ' ' + numMatch[3].toUpperCase();
+  // Noon / midnight
+  if(/\bnoon\b/.test(lower))     return '12:00 PM';
+  if(/\bmidnight\b/.test(lower)) return '12:00 AM';
 
-  const hourWords = { one:1, two:2, three:3, four:4, five:5, six:6, seven:7, eight:8, nine:9, ten:10, eleven:11, twelve:12 };
-  const minWords  = {
-    oh:0, zero:0, five:5, ten:10, fifteen:15, twenty:20,
-    'twenty five':25, 'twenty-five':25, thirty:30,
-    'thirty five':35, 'thirty-five':35, forty:40,
-    'forty five':45, 'forty-five':45, fifty:50,
-    'fifty five':55, 'fifty-five':55
+  // Numeric HH:MM or HH.MM with optional am/pm
+  const numColon = lower.match(/\b(\d{1,2})[:.](\d{2})\s*(am|pm)?\b/);
+  if(numColon){
+    let h = parseInt(numColon[1]), min = parseInt(numColon[2]);
+    const meridiem = numColon[3];
+    if(meridiem){
+      if(meridiem === 'pm' && h < 12) h += 12;
+      if(meridiem === 'am' && h === 12) h = 0;
+      return `${h % 12 || 12}:${String(min).padStart(2,'0')} ${meridiem.toUpperCase()}`;
+    }
+    // 24h if h > 12
+    if(h > 12){
+      return `${h-12}:${String(min).padStart(2,'0')} PM`;
+    }
+    // Ambiguous — keep as-is with AM
+    return `${h}:${String(min).padStart(2,'0')} AM`;
+  }
+
+  const hourWords = {
+    one:1, two:2, three:3, four:4, five:5, six:6, seven:7, eight:8,
+    nine:9, ten:10, eleven:11, twelve:12
+  };
+  const minWords = {
+    'oh':0, 'oh oh':0, 'zero':0, 'five':5, 'ten':10, 'fifteen':15,
+    'twenty':20, 'twenty five':25, 'twenty-five':25,
+    'thirty':30, 'thirty five':35, 'thirty-five':35,
+    'forty':40, 'forty five':45, 'forty-five':45,
+    'fifty':50, 'fifty five':55, 'fifty-five':55
   };
 
+  // "half past HOUR" → :30
+  const halfPast = lower.match(/\bhalf\s+past\s+(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\s*(am|pm)?\b/);
+  if(halfPast){
+    const h = hourWords[halfPast[1]];
+    const mer = halfPast[2] || (h >= 8 && h <= 11 ? 'am' : 'pm');
+    return `${h}:30 ${mer.toUpperCase()}`;
+  }
+
+  // "quarter past HOUR" → :15
+  const qtrPast = lower.match(/\bquarter\s+past\s+(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\s*(am|pm)?\b/);
+  if(qtrPast){
+    const h = hourWords[qtrPast[1]];
+    const mer = qtrPast[2] || (h >= 8 && h <= 11 ? 'am' : 'pm');
+    return `${h}:15 ${mer.toUpperCase()}`;
+  }
+
+  // "quarter to HOUR" → HOUR-1 :45
+  const qtrTo = lower.match(/\bquarter\s+to\s+(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\s*(am|pm)?\b/);
+  if(qtrTo){
+    let h = hourWords[qtrTo[1]] - 1;
+    if(h <= 0) h = 12;
+    const mer = qtrTo[2] || (h >= 8 && h <= 11 ? 'am' : 'pm');
+    return `${h}:45 ${mer.toUpperCase()}`;
+  }
+
   // "HOUR MINUTE am/pm"
-  const spoken = lower.match(
-    /\b(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\s+(fifty[- ]five|forty[- ]five|thirty[- ]five|twenty[- ]five|fifty|forty|thirty|twenty|fifteen|ten|oh|zero|five)\s*(am|pm)\b/
+  const spokenFull = lower.match(
+    /\b(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\s+(fifty[- ]five|forty[- ]five|thirty[- ]five|twenty[- ]five|fifty|forty|thirty|twenty|fifteen|ten|oh\s?oh|oh|zero|five)\s*(am|pm)\b/
   );
-  if(spoken){
-    const h   = hourWords[spoken[1]];
-    const key = spoken[2].replace('-',' ');
+  if(spokenFull){
+    const h = hourWords[spokenFull[1]];
+    const key = spokenFull[2].replace('-',' ').replace(/\s+/g,' ').trim();
     const min = minWords[key] !== undefined ? minWords[key] : 0;
-    return `${h}:${String(min).padStart(2,'0')} ${spoken[3].toUpperCase()}`;
+    return `${h}:${String(min).padStart(2,'0')} ${spokenFull[3].toUpperCase()}`;
   }
 
   // "HOUR am/pm"
-  const simple = lower.match(/\b(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\s*(am|pm)\b/);
-  if(simple) return `${hourWords[simple[1]]}:00 ${simple[2].toUpperCase()}`;
+  const spokenSimple = lower.match(/\b(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\s*(am|pm)\b/);
+  if(spokenSimple) return `${hourWords[spokenSimple[1]]}:00 ${spokenSimple[2].toUpperCase()}`;
+
+  // Bare numeric hour with am/pm: "9 am", "10 pm"
+  const bareNum = lower.match(/\b(\d{1,2})\s*(am|pm)\b/);
+  if(bareNum){
+    let h = parseInt(bareNum[1]);
+    const mer = bareNum[2].toUpperCase();
+    return `${h}:00 ${mer}`;
+  }
+
+  // "at HH" where HH > 12 implies 24h
+  const atHour = lower.match(/\bat\s+(\d{1,2})\b/);
+  if(atHour){
+    const h = parseInt(atHour[1]);
+    if(h >= 13 && h <= 23) return `${h-12}:00 PM`;
+    if(h === 0) return '12:00 AM';
+  }
 
   return null;
 }
@@ -884,10 +1022,37 @@ window.openGoogleCalendar = function(){
 };
 
 /* ════════════════════════════════════════════════════════
-   TEXT-MODE FALLBACK HANDLER
+   TEXT-MODE CONVERSATION HANDLER
+   ── BUG FIX: When vapi is available, text input now starts
+   a real Vapi voice call (with the typed message pre-loaded),
+   instead of doing a dummy local response.
+   When vapi is NOT available, falls back to smart local parse.
 ════════════════════════════════════════════════════════ */
-function handleTextInput(text){
+async function handleTextInput(text){
   addMsg("user", text);
+
+  // ── If we have a live vapi session, send through it ──
+  if(vapi && appState === 'active' && isVoiceMode){
+    try {
+      vapi.send({ type:"add-message", message:{ role:"user", content:text } });
+    } catch(e) {
+      console.warn('[SAMAY] vapi.send failed:', e);
+    }
+    return;
+  }
+
+  // ── If VapiClass is loaded, start a real call with this text ──
+  if(VapiClass && !isVoiceMode){
+    pendingInitialText = text;
+    await startCallWithMessage(text);
+    return;
+  }
+
+  // ── Pure text fallback (no Vapi available) ──
+  handleTextFallback(text);
+}
+
+function handleTextFallback(text){
   if(text.toLowerCase().match(/schedule|book|set.?up|meeting|appointment|call|remind/)){
     showTyping(true);
     setTimeout(async () => {
@@ -927,10 +1092,7 @@ function loadVapi(){
 }
 
 /* ════════════════════════════════════════════════════════
-   VAPI — WIRE EVENT LISTENERS
-   FIX 4: Called exactly once (guarded by vapiWired flag).
-   This prevents KrispSDK from being imported multiple times on
-   call restarts, which caused the duplication warning.
+   VAPI — WIRE EVENT LISTENERS (exactly once)
 ════════════════════════════════════════════════════════ */
 function wireVapi(){
   if(vapiWired) return;
@@ -938,12 +1100,25 @@ function wireVapi(){
 
   vapi.on("call-start", () => {
     console.log('[VAPI EVENT] call-start');
-    // Reset all per-call state here
     assistantBuffer = '';
     allUserSpeech   = '';
     userUtterances  = [];
     pendingEvent    = null;
     goActive();
+
+    // ── FIX: If started from a text message, inject it into the call ──
+    if(pendingInitialText){
+      const msgToSend = pendingInitialText;
+      pendingInitialText = null;
+      setTimeout(() => {
+        try {
+          vapi.send({ type:"add-message", message:{ role:"user", content: msgToSend } });
+          allUserSpeech += ' ' + msgToSend;
+          userUtterances.push(msgToSend);
+          console.log('[SAMAY] Injected initial text into call:', msgToSend);
+        } catch(e){ console.warn('[SAMAY] Could not inject initial text:', e); }
+      }, 800);
+    }
   });
 
   vapi.on("call-end", () => {
@@ -965,7 +1140,7 @@ function wireVapi(){
   vapi.on("message", msg => {
     console.log('[VAPI MESSAGE] type:', msg.type);
 
-    /* ── 1. TOOL CALL ───────────────────────────────────────────── */
+    /* ── 1. TOOL CALL ── */
     if(msg.type === 'tool-calls' || msg.type === 'function-call'){
       console.log('[VAPI TOOL RAW]', JSON.stringify(msg, null, 2));
       const toolList = msg.toolCallList || msg.toolCalls ||
@@ -985,7 +1160,6 @@ function wireVapi(){
         let args = fnArgs;
         if(typeof args === 'string'){ try{ args = JSON.parse(args); }catch(e){ args={}; } }
 
-        // Parse date from tool arguments (ISO strings preferred)
         let eventDate = null;
         if(args.date){
           const raw = args.date.trim();
@@ -995,7 +1169,7 @@ function wireVapi(){
             const [y,mo,dy] = raw.split('-').map(Number);
             eventDate = new Date(y, mo-1, dy);
           } else {
-            eventDate = new Date(raw);
+            eventDate = parseDateFromText(raw) || new Date(raw);
           }
           if(isNaN(eventDate?.getTime())) eventDate = null;
         }
@@ -1012,7 +1186,7 @@ function wireVapi(){
       return;
     }
 
-    /* ── 2. TOOL CALL RESULT ────────────────────────────────────── */
+    /* ── 2. TOOL CALL RESULT ── */
     if(msg.type === 'tool-call-result' || msg.type === 'function-call-result'){
       console.log('[VAPI TOOL RESULT]', JSON.stringify(msg));
       try{
@@ -1023,7 +1197,7 @@ function wireVapi(){
           if(rawDate){
             evDate = /^\d{4}-\d{2}-\d{2}$/.test(rawDate.trim())
               ? (([y,mo,dy]) => new Date(y, mo-1, dy))(rawDate.trim().split('-').map(Number))
-              : new Date(rawDate);
+              : parseDateFromText(rawDate) || new Date(rawDate);
           }
           if(!evDate || isNaN(evDate.getTime())) evDate = new Date(Date.now() + 86400000);
 
@@ -1041,7 +1215,7 @@ function wireVapi(){
       return;
     }
 
-    /* ── 3. TRANSCRIPT ──────────────────────────────────────────── */
+    /* ── 3. TRANSCRIPT ── */
     if(msg.type === "transcript" && msg.transcriptType === "final"){
       showTyping(false);
       addMsg(msg.role === "user" ? "user" : "ai", msg.transcript);
@@ -1058,41 +1232,25 @@ function wireVapi(){
         assistantBuffer += ' ' + text;
 
         if(/meeting[\s_-]?confirmed/i.test(text)){
-          console.log('[VAPI] ✅ MEETING_CONFIRMED detected in:', text);
-          console.log('[VAPI] pendingEvent:', JSON.stringify(pendingEvent));
-          console.log('[VAPI] allUserSpeech:', allUserSpeech);
-
+          console.log('[VAPI] ✅ MEETING_CONFIRMED detected');
           let ev;
 
           if(pendingEvent){
-            // ── Happy path: tool call gave us clean structured data ──
             ev = { ...pendingEvent };
-
           } else {
-            // ── Fallback: reconstruct from accumulated speech ────────
-
-            // FIX 1b in action: parseDateFromText now tries spokenToNum before
-            // stripping ordinal suffixes, so "February twenty eighth" → Feb 28.
             let eventDate = parseDateFromText(allUserSpeech);
-            if(!eventDate){
-              eventDate = parseDateFromText(assistantBuffer);
-              console.log('[VAPI] Date from assistantBuffer:', eventDate, '| buffer:', assistantBuffer);
-            }
+            if(!eventDate) eventDate = parseDateFromText(assistantBuffer);
             if(!eventDate) eventDate = new Date(Date.now() + 86400000);
 
             let time = parseSpokenTime(allUserSpeech);
             if(!time) time = parseSpokenTime(assistantBuffer);
 
-            // FIX 2: Strip trailing punctuation [.!?,] before applying filters
-            // so "Yes." is correctly caught as a filler word.
             const isDateWord = /(january|february|march|april|may|june|july|august|september|october|november|december|monday|tuesday|wednesday|thursday|friday|saturday|sunday|tomorrow|today|next|twenty|thirty|first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth|\d)/i;
             const isTimeWord = /(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|\d)\s*(am|pm|ist)/i;
-            // FIX 2b: filler regex now allows trailing punctuation via [.!?,]*
             const isFiller   = /^(yes|no|okay|ok|sure|thanks|thank|hello|hi|namaste|please|proceed|blank|leave|skip|none|no title|am|pm)[.!?,]*$/i;
 
             let title = 'Meeting';
             for(const utt of [...userUtterances].reverse()){
-              // FIX 2a: strip trailing punctuation BEFORE testing
               const u = utt.trim().replace(/[.!?,]+$/, '');
               if(u.length < 2)       continue;
               if(isFiller.test(u))   continue;
@@ -1124,23 +1282,52 @@ function wireVapi(){
 }
 
 /* ════════════════════════════════════════════════════════
-   VAPI — START CALL
-   FIX 4: Create the VapiClass instance ONCE and reuse it.
-   Subsequent calls just call vapi.start() on the existing instance.
-   This eliminates the KrispSDK duplicate import warning.
+   VAPI — START CALL (voice mode, from call button)
 ════════════════════════════════════════════════════════ */
 async function startCall(){
   if(!VapiClass){ showToast("⚠ vapi-bundle.js not loaded yet — use text mode"); return; }
-  goConnecting();
+  isVoiceMode = true;
+  pendingInitialText = null;
+  goConnecting('Connecting…');
   try{
     if(!vapi){
-      vapi = new VapiClass(PUBLIC_KEY); // created exactly once
-      wireVapi();                        // listeners attached exactly once
+      vapi = new VapiClass(PUBLIC_KEY);
+      wireVapi();
     }
     await vapi.start(ASSISTANT_ID);
   } catch(e){
     showToast("⚠ " + (e.message || "Could not connect"));
     goIdle();
+  }
+}
+
+/* ════════════════════════════════════════════════════════
+   VAPI — START CALL WITH INITIAL TEXT MESSAGE
+   Called when user types in the idle input instead of pressing call.
+   Connects to Vapi, then injects the typed message.
+════════════════════════════════════════════════════════ */
+async function startCallWithMessage(text){
+  if(!VapiClass){
+    // Vapi not loaded — pure local fallback
+    setState('active');
+    handleTextFallback(text);
+    return;
+  }
+  isVoiceMode = false; // text-initiated but using vapi
+  pendingInitialText = text;
+  goConnecting('Connecting…');
+  try{
+    if(!vapi){
+      vapi = new VapiClass(PUBLIC_KEY);
+      wireVapi();
+    }
+    await vapi.start(ASSISTANT_ID);
+  } catch(e){
+    showToast("⚠ " + (e.message || "Could not connect"));
+    pendingInitialText = null;
+    // Fallback to local text handling
+    setState('active');
+    handleTextFallback(text);
   }
 }
 
@@ -1151,25 +1338,36 @@ callBtn.addEventListener("click", startCall);
 
 cancelBtn.addEventListener("click", () => {
   if(vapi) vapi.stop();
+  pendingInitialText = null;
   goIdle();
 });
 
+// ── FIX: Idle input — connects to Vapi (or local fallback) and sends message
 idleInput.addEventListener("keydown", e => {
   if(e.key === "Enter" && idleInput.value.trim()){
     const v = idleInput.value.trim();
     idleInput.value = "";
+    // Show the message in transcript right away
     setState('active');
     handleTextInput(v);
   }
 });
 
+// ── Active input — sends through live vapi or local fallback
 activeInput.addEventListener("keydown", e => {
   if(e.key === "Enter" && activeInput.value.trim()){
     const v = activeInput.value.trim();
     activeInput.value = "";
-    if(vapi?.send){
+    if(vapi && appState === 'active'){
       addMsg("user", v);
-      vapi.send({ type:"add-message", message:{ role:"user", content:v } });
+      allUserSpeech += ' ' + v;
+      userUtterances.push(v);
+      try {
+        vapi.send({ type:"add-message", message:{ role:"user", content:v } });
+      } catch(e) {
+        console.warn('[SAMAY] vapi.send failed, using fallback:', e);
+        handleTextFallback(v);
+      }
     } else {
       handleTextInput(v);
     }
