@@ -446,6 +446,7 @@ let lastMeetingTime    = null; // populated when tool fires
 let pendingEvent       = null; // full event object ready to show
 let assistantBuffer    = '';   // accumulates assistant speech across chunks
 let allUserSpeech      = '';   // all user speech concatenated
+let userUtterances     = [];   // each user utterance stored separately
 let allMeetingTitle    = '';   // title captured from tool call args
 
 /* ════════════════════
@@ -895,6 +896,7 @@ function wireVapi(){
     assistantBuffer = '';
     allUserSpeech   = '';
     allMeetingTitle = '';
+    userUtterances  = [];
     goActive();
   });
 
@@ -980,6 +982,7 @@ function wireVapi(){
       if(msg.role === "user"){
         lastUserUtterance = msg.transcript;
         allUserSpeech += ' ' + msg.transcript;
+        userUtterances.push(msg.transcript);
         console.log('[VAPI] User said:', msg.transcript);
       }
       if(msg.role === "assistant"){
@@ -996,49 +999,49 @@ function wireVapi(){
           const gcalLink = pendingEvent?.gcalLink || null;
 
           // ── SOURCE OF TRUTH: what the USER said ──
-          // Tool-call event doesn't reach frontend, agent speech is garbled.
-          // User speech is always clean: "Twenty eighth February", "Ten AM", "Project sync"
           console.log('[VAPI] allUserSpeech:', allUserSpeech);
+          const speech = allUserSpeech.toLowerCase();
 
-          // DATE — parse from everything the user said during the call
+          // ── DATE ──
           let eventDate = parseDateFromText(allUserSpeech);
           if(!eventDate) eventDate = new Date(Date.now() + 86400000);
           console.log('[VAPI] Date from user speech:', eventDate);
 
-          // TIME — find the last time the user mentioned (e.g. "Ten AM", "3:30 PM")
-          const timeWords = {
-            'one':1,'two':2,'three':3,'four':4,'five':5,'six':6,
-            'seven':7,'eight':8,'nine':9,'ten':10,'eleven':11,'twelve':12
-          };
+          // ── TIME — handles "One PM", "10 AM", "Three thirty PM" ──
+          const timeNums = {one:1,two:2,three:3,four:4,five:5,six:6,seven:7,eight:8,nine:9,ten:10,eleven:11,twelve:12};
           let time = null;
-          // Match digit time: "10 AM", "3:30 PM"
-          const digitTime = allUserSpeech.match(/(\d{1,2})(?::(\d{2}))?\s*(AM|PM)/i);
-          // Match word time: "Ten AM", "Nine PM"
-          const wordTime  = allUserSpeech.match(/(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)(?:\s+thirty)?\s*(AM|PM)/i);
-          if(digitTime){
-            time = digitTime[1] + (digitTime[2] ? ':'+digitTime[2] : ':00') + ' ' + digitTime[3].toUpperCase();
-          } else if(wordTime){
-            const h = timeWords[wordTime[1].toLowerCase()];
-            const half = /thirty/i.test(wordTime[0]) ? ':30' : ':00';
-            time = h + half + ' ' + wordTime[2].toUpperCase();
+
+          // Try digit first: "10 AM", "3:30 PM"
+          const dtm = speech.match(/(\d{1,2})(?::(\d{2}))?\s*(am|pm)/);
+          if(dtm){
+            time = dtm[1] + ':' + (dtm[2]||'00') + ' ' + dtm[3].toUpperCase();
+          } else {
+            // Word time: "one pm", "ten am", "three thirty pm"
+            const wtm = speech.match(/(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)(\s+thirty)?\s*(am|pm)/);
+            if(wtm){
+              const h = timeNums[wtm[1]];
+              const m = wtm[2] ? '30' : '00';
+              time = h + ':' + m + ' ' + wtm[3].toUpperCase();
+            }
           }
           console.log('[VAPI] Time from user speech:', time);
 
-          // TITLE — last substantive thing user said that isn't a date/time/name/filler
-          // Walk through all user utterances and find one that looks like a title
-          const stopWords = /^(yes|no|okay|ok|sure|thanks|thank|am|pm|ist|hello|hi|namaste|please|proceed|blank|leave|skip|none|no title)$/i;
-          const timePattern = /^\d{1,2}(?::\d{2})?\s*(am|pm|ist)$|^(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)(\s+thirty)?\s*(am|pm|ist)$/i;
-          const dateTimePattern = /(january|february|march|april|may|june|july|august|september|october|november|december|monday|tuesday|wednesday|thursday|friday|saturday|sunday|tomorrow|today|next|am|pm|ist|\d{1,2})/i;
-          const userParts = allUserSpeech.trim().split(/\s*\.\s*|\s{2,}/).map(s => s.trim()).filter(Boolean);
+          // ── TITLE — each user utterance is stored separately, find the title one ──
+          // userUtterances is an array of each thing the user said
+          const isDatePart = /(january|february|march|april|may|june|july|august|september|october|november|december|monday|tuesday|wednesday|thursday|friday|saturday|sunday|tomorrow|today|next|twenty|thirty|first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth|\d)/i;
+          const isTimePart = /(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|\d)\s*(am|pm|ist)/i;
+          const isFiller   = /^(yes|no|okay|ok|sure|thanks|thank|hello|hi|namaste|please|proceed|blank|leave|skip|none|no title|am|pm)$/i;
+          
           let title = 'Meeting';
-          // Go through utterances in reverse — last meaningful one is likely the title
-          for(let i = userParts.length - 1; i >= 0; i--){
-            const part = userParts[i].trim();
-            if(part.length < 2) continue;
-            if(stopWords.test(part)) continue;
-            if(timePattern.test(part)) continue;
-            if(dateTimePattern.test(part) && part.split(' ').length <= 4) continue;
-            title = part.charAt(0).toUpperCase() + part.slice(1);
+          // Go through utterances newest-first, pick first that isn't date/time/filler
+          const uttList = userUtterances.slice().reverse();
+          for(const utt of uttList){
+            const u = utt.trim();
+            if(u.length < 2) continue;
+            if(isFiller.test(u)) continue;
+            if(isTimePart.test(u)) continue;
+            if(isDatePart.test(u)) continue;
+            title = u.charAt(0).toUpperCase() + u.slice(1);
             break;
           }
           console.log('[VAPI] Title from user speech:', title);
