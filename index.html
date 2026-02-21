@@ -26,17 +26,15 @@ body::after {
 
 .scene { width:100%; height:100%; position:relative; display:flex; align-items:center; justify-content:center; }
 
-/* FIX: consistent translate(-50%,-50%) on idle; snap to corner on other states */
 .orb-wrap {
   position:absolute; width:280px; height:280px; top:50%; left:50%;
-  transform:translate(-50%, -50%) scale(1);
+  transform:translate(-50%, -54%) scale(1); transform-origin: top left;
   transition: top .72s cubic-bezier(.65,0,.35,1), left .72s cubic-bezier(.65,0,.35,1),
               transform .72s cubic-bezier(.65,0,.35,1), opacity .5s;
   z-index:20; cursor:pointer;
 }
-.scene.active .orb-wrap,
-.scene.calendar .orb-wrap,
-.scene.connecting .orb-wrap { top:22px; left:18px; transform:translate(0,0) scale(0.1714); }
+.scene.active  .orb-wrap { top:22px; left:18px; transform:translate(0,0) scale(0.1714); }
+.scene.calendar .orb-wrap { top:22px; left:18px; transform:translate(0,0) scale(0.1714); }
 
 .orb {
   position:relative; width:100%; height:100%; border-radius:50%; overflow:hidden;
@@ -46,7 +44,7 @@ body::after {
   filter: drop-shadow(0 0 40px rgba(58,134,255,0.20)) drop-shadow(0 20px 48px rgba(0,0,0,0.22));
   transition: filter .5s;
 }
-.scene.active .orb, .scene.calendar .orb, .scene.connecting .orb {
+.scene.active .orb, .scene.calendar .orb {
   animation: orbFloatMini 5s ease-in-out infinite;
   filter: drop-shadow(0 2px 10px rgba(0,0,0,0.25));
 }
@@ -112,22 +110,21 @@ body::after {
 }
 .scene.connecting .connecting-ui { opacity:1; pointer-events:none; transform:translateX(-50%) translateY(0); }
 
-/* FIX: ripple uses translate(-50%,-50%) matching new orb center baseline */
 .orb-ring {
   position:absolute; width:280px; height:280px; border-radius:50%;
   border:1.5px solid rgba(58,134,255,0.35); top:50%; left:50%;
-  transform:translate(-50%,-50%) scale(1); opacity:0; pointer-events:none; z-index:15;
+  transform:translate(-50%,-54%) scale(1); opacity:0; pointer-events:none; z-index:15;
 }
 .scene.connecting .orb-ring { animation: ripple 2.2s ease-out infinite; }
 .scene.connecting .orb-ring:nth-child(2) { animation-delay:.55s; border-color:rgba(45,154,62,0.28); }
 .scene.connecting .orb-ring:nth-child(3) { animation-delay:1.1s; border-color:rgba(212,252,121,0.22); }
 @keyframes ripple {
-  0%   { transform:translate(-50%,-50%) scale(1);   opacity:.8; }
-  100% { transform:translate(-50%,-50%) scale(1.55); opacity:0; }
+  0%   { transform:translate(-50%,-54%) scale(1);   opacity:.8; }
+  100% { transform:translate(-50%,-54%) scale(1.55); opacity:0; }
 }
 
 .conn-pill {
-  background:rgba(255,255,255,0.88); backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px);
+  background:rgba(255,255,255,0.88); backdrop-filter:blur(12px);
   border:1px solid rgba(0,0,0,0.07); border-radius:100px; padding:10px 22px;
   display:flex; align-items:center; gap:10px;
   box-shadow:0 4px 24px rgba(0,0,0,0.10); white-space:nowrap;
@@ -142,7 +139,7 @@ body::after {
 .btn-cancel {
   width:38px; height:38px; border-radius:50%; border:none; background:rgba(255,255,255,0.75);
   box-shadow:0 1px 8px rgba(0,0,0,0.10); cursor:pointer; display:flex; align-items:center; justify-content:center;
-  transition:background .15s, transform .12s; backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px);
+  transition:background .15s, transform .12s; backdrop-filter:blur(8px);
 }
 .btn-cancel:hover { background:#fff; transform:scale(1.06); }
 .btn-cancel svg { color:#aaa; }
@@ -154,8 +151,7 @@ body::after {
   transition:opacity .42s .26s; z-index:10;
 }
 .scene.active .convo-area { opacity:1; pointer-events:all; }
-.scene.calendar .convo-area, .scene.connecting .convo-area { opacity:0 !important; pointer-events:none !important; }
-
+.scene.calendar .convo-area { opacity:0 !important; pointer-events:none !important; }
 .transcript { flex:1; overflow-y:auto; display:flex; flex-direction:column; gap:18px; }
 .transcript::-webkit-scrollbar { display:none; }
 .msg { font-size:16px; line-height:1.68; color:var(--text); max-width:92%; animation:msgIn .38s cubic-bezier(.16,1,.3,1) both; }
@@ -174,8 +170,7 @@ body::after {
   transition:opacity .35s .22s, transform .35s .22s;
 }
 .scene.active .active-bar { opacity:1; transform:translateY(0); pointer-events:all; }
-.scene.calendar .active-bar, .scene.connecting .active-bar { opacity:0 !important; pointer-events:none !important; transform:translateY(10px) !important; }
-
+.scene.calendar .active-bar { opacity:0 !important; pointer-events:none !important; }
 .btn-hangup {
   width:50px; height:50px; border-radius:50%; border:none; background:#fff;
   box-shadow:0 1px 8px rgba(0,0,0,0.10),0 0 0 1px rgba(0,0,0,0.05);
@@ -261,7 +256,7 @@ body::after {
 }
 .cal-icon-btn {
   width:28px; height:28px; border-radius:50%; border:none; background:transparent;
-  display:flex; align-items:center; justify-content:justify-content; cursor:pointer; transition:background .15s;
+  display:flex; align-items:center; justify-content:center; cursor:pointer; transition:background .15s;
 }
 .cal-icon-btn:hover { background:rgba(0,0,0,0.05); }
 .cal-icon-btn svg { color:#bbb; }
@@ -289,23 +284,10 @@ body::after {
 .badge-future { background:rgba(212,252,121,0.30); color:#4a7a1a; }
 .ev-divider { height:1px; background:rgba(0,0,0,0.05); margin:0 16px; }
 
-/* ══ BACK BUTTON ══ */
-.btn-back {
-  position:fixed; top:18px; right:18px; z-index:99999;
-  padding:8px 18px; border-radius:100px; border:none;
-  background:rgba(255,255,255,0.85); backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px);
-  font-family:var(--font); font-size:13px; font-weight:500; color:var(--text-mid);
-  cursor:pointer; box-shadow:0 2px 12px rgba(0,0,0,0.10);
-  opacity:0; pointer-events:none; transition:opacity .35s, transform .25s;
-  transform:translateY(-8px);
-}
-.scene.calendar .btn-back { opacity:1; pointer-events:all; transform:translateY(0); }
-.btn-back:hover { background:#fff; }
-
 /* ══ DEBUG OVERLAY ══ */
 .debug-overlay {
   position:fixed; top:12px; right:12px; z-index:99999;
-  background:rgba(0,0,0,0.82); backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px);
+  background:rgba(0,0,0,0.82); backdrop-filter:blur(10px);
   color:#D4FC79; font-family:monospace; font-size:11px; line-height:1.7;
   padding:12px 16px; border-radius:14px; max-width:300px;
   border:1px solid rgba(212,252,121,0.25);
@@ -324,11 +306,11 @@ body::after {
 }
 .debug-overlay .db-close:hover { color:#fff; }
 
-/* ══ TOAST — FIX: z-index above calendar overlay ══ */
+/* ══ TOAST ══ */
 .toast {
   position:fixed; bottom:24px; left:50%; transform:translateX(-50%) translateY(52px);
-  background:rgba(18,18,18,0.84); backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px);
-  color:#fff; padding:9px 20px; border-radius:100px; font-size:12.5px; z-index:99998;
+  background:rgba(18,18,18,0.84); backdrop-filter:blur(10px);
+  color:#fff; padding:9px 20px; border-radius:100px; font-size:12.5px; z-index:999;
   transition:transform .35s cubic-bezier(.16,1,.3,1); white-space:nowrap;
 }
 .toast.show { transform:translateX(-50%) translateY(0); }
@@ -379,12 +361,12 @@ body::after {
 
   <!-- STATE 1: IDLE -->
   <div class="idle-bar" id="idleBar">
-    <button class="btn-phone" id="callBtn" title="Start voice call">
+    <button class="btn-phone" id="callBtn">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
         <path d="M6.62 10.79a15.05 15.05 0 006.59 6.59l2.2-2.2a1 1 0 011.01-.25 11.36 11.36 0 003.56.57 1 1 0 011 1V20a1 1 0 01-1 1A17 17 0 013 4a1 1 0 011-1h3.5a1 1 0 011 1c0 1.25.2 2.45.57 3.57a1 1 0 01-.25 1.01l-2.2 2.21z"/>
       </svg>
     </button>
-    <input class="input-idle" id="idleInput" type="text" placeholder="Or type a message…" autocomplete="off" spellcheck="false"/>
+    <input class="input-idle" id="idleInput" type="text" placeholder="Or type a message..." autocomplete="off"/>
   </div>
 
   <!-- CONNECTING UI -->
@@ -409,13 +391,13 @@ body::after {
     </div>
   </div>
   <div class="active-bar">
-    <button class="btn-hangup" id="hangupBtn" title="End call">
+    <button class="btn-hangup" id="hangupBtn">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
         <path d="M10.68 13.31a16 16 0 003.41 2.6l1.27-1.27a2 2 0 012.11-.45 12.84 12.84 0 002.81.7 2 2 0 012 2v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.42 19.42 0 013.43 9.64a19.86 19.86 0 01-3.07-8.67A2 2 0 012.18 0h3a2 2 0 012 1.72 12.84 12.84 0 00.7 2.81 2 2 0 01-.45 2.11L6.18 7.91"/>
         <line x1="1" y1="1" x2="23" y2="23"/>
       </svg>
     </button>
-    <input class="input-active" id="activeInput" type="text" placeholder="Type a message…" autocomplete="off" spellcheck="false"/>
+    <input class="input-active" id="activeInput" type="text" placeholder="Type a message..." autocomplete="off"/>
   </div>
 
   <!-- STATE 3: CALENDAR -->
@@ -423,11 +405,11 @@ body::after {
     <div class="cal-card">
       <div class="cal-left">
         <div class="cal-top-row">
-          <button class="cal-nav-btn" id="calPrevBtn" title="Previous month">
+          <button class="cal-nav-btn" onclick="changeMonth(-1)">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
           </button>
           <span class="cal-month-label" id="calMonthLabel"></span>
-          <button class="cal-nav-btn" id="calNextBtn" title="Next month">
+          <button class="cal-nav-btn" onclick="changeMonth(1)">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
           </button>
         </div>
@@ -438,10 +420,10 @@ body::after {
       </div>
       <div class="cal-right">
         <div class="cal-right-top">
-          <button class="cal-icon-btn" title="Search">
+          <button class="cal-icon-btn">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
           </button>
-          <button class="cal-icon-btn" title="More options">
+          <button class="cal-icon-btn">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>
           </button>
         </div>
@@ -460,11 +442,8 @@ body::after {
   </div>
 </div>
 
-<!-- FIX: Back button to escape calendar view, outside .scene so z-index works cleanly -->
-<button class="btn-back" id="backBtn">← Back</button>
-
 <div class="debug-overlay" id="debugOverlay">
-  <div class="db-close" id="debugClose">✕</div>
+  <div class="db-close" onclick="document.getElementById('debugOverlay').classList.remove('show')">✕</div>
   <div class="db-head">🛠 Event Debug</div>
   <div class="db-row"><span class="db-key">title</span><span class="db-val" id="db-title">—</span></div>
   <div class="db-row"><span class="db-key">date</span><span class="db-val" id="db-date">—</span></div>
@@ -486,18 +465,17 @@ const CALENDAR_EMAIL = '1mp22cs021@gmail.com';
 /* ════════════════════════════════════════════════════════
    STATE
 ════════════════════════════════════════════════════════ */
-let vapi           = null;   // single instance, never nulled after first creation
-let VapiClass      = null;
-let vapiWired      = false;  // wireVapi() runs exactly once
-let appState       = 'idle';
-let scheduledEvent = null;
-let calYear        = new Date().getFullYear();
-let calMonth       = new Date().getMonth();
-let pendingEvent   = null;
-let assistantBuffer = '';
-let allUserSpeech   = '';
-let userUtterances  = [];
-let toastTimer      = null;  // FIX: clear old timer before showing new toast
+let vapi              = null;   // FIX 4: single Vapi instance, never nulled after creation
+let VapiClass         = null;
+let vapiWired         = false;  // FIX 4: ensure wireVapi() runs exactly once
+let appState          = 'idle';
+let scheduledEvent    = null;
+let calYear           = new Date().getFullYear();
+let calMonth          = new Date().getMonth();
+let pendingEvent      = null;   // set by tool-call handler; used at MEETING_CONFIRMED
+let assistantBuffer   = '';     // accumulates all assistant speech this call
+let allUserSpeech     = '';     // accumulates all user speech this call
+let userUtterances    = [];     // individual user turns this call
 
 /* ════════════════════════════════════════════════════════
    DOM REFS
@@ -510,7 +488,6 @@ const idleInput    = document.getElementById("idleInput");
 const callBtn      = document.getElementById("callBtn");
 const hangupBtn    = document.getElementById("hangupBtn");
 const cancelBtn    = document.getElementById("cancelBtn");
-const backBtn      = document.getElementById("backBtn");
 const blobs        = document.getElementById("blobs");
 const toastEl      = document.getElementById("toast");
 const calGrid      = document.getElementById("calGrid");
@@ -522,20 +499,17 @@ const connLabel    = document.getElementById("connLabel");
 /* ════════════════════════════════════════════════════════
    PARALLAX ORB
 ════════════════════════════════════════════════════════ */
-let mx=0, my=0, tx=0, ty=0;
+let mx=0,my=0,tx=0,ty=0;
 document.addEventListener('mousemove', e => {
-  if(appState !== 'idle') return; // FIX: skip parallax when orb is corner-pinned
   const r = document.getElementById("orb").getBoundingClientRect();
-  if(!r.width) return;
-  mx = Math.max(-1, Math.min(1, (e.clientX - r.left - r.width/2)  / (r.width/2)));
-  my = Math.max(-1, Math.min(1, (e.clientY - r.top  - r.height/2) / (r.height/2)));
+  mx = (e.clientX - r.left - r.width/2)  / (r.width/2);
+  my = (e.clientY - r.top  - r.height/2) / (r.height/2);
 });
-
 (function orbTick(){
-  tx += (mx - tx) * 0.04;
-  ty += (my - ty) * 0.04;
-  // FIX: always include base offset; was '' which caused layout jump
-  blobs.style.transform = `translate(calc(-20% + ${appState === 'idle' ? tx*10 : 0}px), calc(-20% + ${appState === 'idle' ? ty*8 : 0}px))`;
+  tx += (mx-tx)*0.04; ty += (my-ty)*0.04;
+  blobs.style.transform = appState === 'idle'
+    ? `translate(calc(-20% + ${tx*10}px), calc(-20% + ${ty*8}px))`
+    : '';
   requestAnimationFrame(orbTick);
 })();
 
@@ -543,10 +517,9 @@ document.addEventListener('mousemove', e => {
    HELPERS
 ════════════════════════════════════════════════════════ */
 function showToast(msg, d=3000){
-  if(toastTimer) clearTimeout(toastTimer); // FIX: cancel previous timer
   toastEl.textContent = msg;
   toastEl.classList.add("show");
-  toastTimer = setTimeout(() => { toastEl.classList.remove("show"); toastTimer = null; }, d);
+  setTimeout(() => toastEl.classList.remove("show"), d);
 }
 
 function setState(s){
@@ -555,29 +528,23 @@ function setState(s){
   if(s === 'connecting') scene.classList.add('connecting');
   if(s === 'active')     scene.classList.add('active');
   if(s === 'calendar')   scene.classList.add('calendar');
-  // Reset parallax when leaving idle so blobs don't stay offset
-  if(s !== 'idle'){ mx=0; my=0; }
+  console.log('[SAMAY] state →', s, '| scene classes:', scene.className);
 }
 
 function goConnecting(){ connLabel.textContent = 'Connecting…'; setState('connecting'); }
 function goActive(){ setState('active'); setTimeout(() => activeInput.focus(), 680); }
 
+/* FIX 4: goIdle() no longer sets vapi = null so we reuse the same instance */
 function goIdle(){
   setState('idle');
-  // FIX: safe child removal without mutating while iterating
-  const children = Array.from(transcript.children);
-  children.forEach(c => { if(c !== typing) transcript.removeChild(c); });
+  Array.from(transcript.children).forEach(c => { if(c !== typing) c.remove(); });
   typing.classList.remove("show");
   activeInput.value = "";
-  idleInput.value   = "";
 }
 
-/* ════════════════════════════════════════════════════════
-   DEBUG OVERLAY
-════════════════════════════════════════════════════════ */
 function showDebug(ev, source){
   const pad = n => String(n).padStart(2,'0');
-  const d   = ev.date;
+  const d = ev.date;
   const dateStr = d ? `${d.getFullYear()}/${pad(d.getMonth()+1)}/${pad(d.getDate())}` : '??';
   const url = `https://calendar.google.com/calendar/r/day/${dateStr}?authuser=${encodeURIComponent(CALENDAR_EMAIL)}`;
 
@@ -590,18 +557,15 @@ function showDebug(ev, source){
   document.getElementById('db-source').textContent = source || 'unknown';
   document.getElementById('db-source').className   = 'db-val ' + (source === 'tool-call' ? 'db-ok' : 'db-warn');
   document.getElementById('db-url').textContent    = url;
-  document.getElementById('db-account').textContent = `authuser=${CALENDAR_EMAIL}`;
+  document.getElementById('db-account').textContent = `authuser=${CALENDAR_EMAIL} (auto)`;
   document.getElementById('db-account').className  = 'db-val db-ok';
+
   document.getElementById('debugOverlay').classList.add('show');
+  console.log('[DEBUG] title:', ev.title, '| date:', dateStr, '| time:', ev.time, '| source:', source, '| url:', url);
 }
 
-// FIX: JS event listener instead of inline onclick (CSP-safe)
-document.getElementById('debugClose').addEventListener('click', () => {
-  document.getElementById('debugOverlay').classList.remove('show');
-});
-
 function goCalendar(event, source){
-  console.log('[SAMAY] goCalendar:', event);
+  console.log('[SAMAY] goCalendar called with:', event);
   scheduledEvent = event;
   calYear  = event.date.getFullYear();
   calMonth = event.date.getMonth();
@@ -615,25 +579,21 @@ function goCalendar(event, source){
    TRANSCRIPT UI
 ════════════════════════════════════════════════════════ */
 function showTyping(v){
-  if(!transcript.contains(typing)) transcript.appendChild(typing);
+  transcript.appendChild(typing);
   typing.classList.toggle("show", v);
   transcript.scrollTop = transcript.scrollHeight;
 }
-
 function addMsg(role, text){
-  if(!text || !text.trim()) return; // FIX: skip empty messages
   if(transcript.contains(typing)) transcript.removeChild(typing);
   const d = document.createElement("div");
-  d.className   = "msg " + role;
-  d.textContent = text; // textContent = XSS-safe
+  d.className  = "msg " + role;
+  d.textContent = text;
   transcript.appendChild(d);
   transcript.appendChild(typing);
   transcript.scrollTop = transcript.scrollHeight;
 }
-
 function typeWrite(text, speed=14){
   return new Promise(res => {
-    if(!text){ res(); return; } // FIX: guard null/empty
     if(transcript.contains(typing)) transcript.removeChild(typing);
     const d = document.createElement("div");
     d.className = "msg ai";
@@ -641,7 +601,7 @@ function typeWrite(text, speed=14){
     transcript.appendChild(typing);
     let i = 0;
     const tick = () => {
-      if(i < text.length){ d.textContent += text[i++]; transcript.scrollTop = transcript.scrollHeight; setTimeout(tick, speed); }
+      if(i < text.length){ d.textContent += text[i++]; transcript.scrollTop = 9999; setTimeout(tick, speed); }
       else res();
     };
     tick();
@@ -650,33 +610,43 @@ function typeWrite(text, speed=14){
 
 /* ════════════════════════════════════════════════════════
    SPOKEN NUMBER → INTEGER
+   FIX 1a: compOrdinals table covers BOTH ordinal and cardinal forms,
+   e.g. "twenty eighth" AND "twenty eight" both → 28.
 ════════════════════════════════════════════════════════ */
 function spokenToNum(str){
   if(!str) return NaN;
   str = str.toLowerCase().trim().replace(/[- ]+/g, ' ');
-  if(/^\d+$/.test(str)) return parseInt(str, 10);
+  if(/^\d+$/.test(str)) return parseInt(str);
 
   const ones = {
-    zero:0,one:1,two:2,three:3,four:4,five:5,six:6,seven:7,eight:8,nine:9,
-    ten:10,eleven:11,twelve:12,thirteen:13,fourteen:14,fifteen:15,sixteen:16,
-    seventeen:17,eighteen:18,nineteen:19,
-    first:1,second:2,third:3,fourth:4,fifth:5,sixth:6,seventh:7,eighth:8,
-    ninth:9,tenth:10,eleventh:11,twelfth:12,thirteenth:13,fourteenth:14,
-    fifteenth:15,sixteenth:16,seventeenth:17,eighteenth:18,nineteenth:19
+    zero:0, one:1, two:2, three:3, four:4, five:5, six:6, seven:7, eight:8, nine:9,
+    ten:10, eleven:11, twelve:12, thirteen:13, fourteen:14, fifteen:15, sixteen:16,
+    seventeen:17, eighteen:18, nineteen:19,
+    first:1, second:2, third:3, fourth:4, fifth:5, sixth:6, seventh:7, eighth:8,
+    ninth:9, tenth:10, eleventh:11, twelfth:12, thirteenth:13, fourteenth:14,
+    fifteenth:15, sixteenth:16, seventeenth:17, eighteenth:18, nineteenth:19
   };
-  const tens = { twenty:20,thirty:30,twentieth:20,thirtieth:30 };
+  const tens = { twenty:20, thirty:30, twentieth:20, thirtieth:30 };
+
+  // Both cardinal and ordinal compound forms
   const compounds = {
-    'twenty one':21,'twenty first':21,'twenty two':22,'twenty second':22,
-    'twenty three':23,'twenty third':23,'twenty four':24,'twenty fourth':24,
-    'twenty five':25,'twenty fifth':25,'twenty six':26,'twenty sixth':26,
-    'twenty seven':27,'twenty seventh':27,'twenty eight':28,'twenty eighth':28,
-    'twenty nine':29,'twenty ninth':29,'thirty one':31,'thirty first':31
+    'twenty one':21,   'twenty first':21,
+    'twenty two':22,   'twenty second':22,
+    'twenty three':23, 'twenty third':23,
+    'twenty four':24,  'twenty fourth':24,
+    'twenty five':25,  'twenty fifth':25,
+    'twenty six':26,   'twenty sixth':26,
+    'twenty seven':27, 'twenty seventh':27,
+    'twenty eight':28, 'twenty eighth':28,
+    'twenty nine':29,  'twenty ninth':29,
+    'thirty one':31,   'thirty first':31
   };
 
   if(ones[str]      !== undefined) return ones[str];
   if(tens[str]      !== undefined) return tens[str];
   if(compounds[str] !== undefined) return compounds[str];
 
+  // Generic tens+ones fallback
   const parts = str.split(' ');
   if(parts.length === 2){
     const t = tens[parts[0]], o = ones[parts[1]];
@@ -696,14 +666,22 @@ function todayMidnight(){
 
 /* ════════════════════════════════════════════════════════
    DATE PARSER
+   FIX 1b: Call spokenToNum on the RAW dayStr FIRST before stripping
+   any ordinal suffix. This prevents "twenty eighth" being clipped to
+   "eight" (→8) by a naive suffix-strip.
+   Uses the LAST month+day match in text so example phrases in the
+   assistant's prompt can't shadow the real date the user gave.
 ════════════════════════════════════════════════════════ */
 function parseDateFromText(text){
   if(!text) return null;
+
   const months = {
-    jan:0,january:0,feb:1,february:1,mar:2,march:2,apr:3,april:3,may:4,
-    jun:5,june:5,jul:6,july:6,aug:7,august:7,sep:8,september:8,
-    oct:9,october:9,nov:10,november:10,dec:11,december:11
+    jan:0,january:0, feb:1,february:1, mar:2,march:2,
+    apr:3,april:3, may:4, jun:5,june:5,
+    jul:6,july:6, aug:7,august:7, sep:8,september:8,
+    oct:9,october:9, nov:10,november:10, dec:11,december:11
   };
+
   const today = todayMidnight();
   const lower = text.toLowerCase();
 
@@ -716,10 +694,12 @@ function parseDateFromText(text){
   const numDay  = '\\d{1,2}(?:st|nd|rd|th)?';
   const dayPat  = `(?:${spokenDay}|${numDay})`;
   const mNames  = 'january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sep|oct|nov|dec';
+
   const r1 = new RegExp(`(${mNames})\\s+(${dayPat})`, 'gi');
   const r2 = new RegExp(`(${dayPat})\\s+(?:of\\s+)?(${mNames})`, 'gi');
 
   let lastMatch = null, lastIndex = -1, m;
+
   while((m = r1.exec(lower)) !== null){
     if(m.index > lastIndex){ lastIndex = m.index; lastMatch = { mStr: m[1], dayStr: m[2] }; }
   }
@@ -730,9 +710,12 @@ function parseDateFromText(text){
   if(lastMatch){
     const mIdx   = months[lastMatch.mStr.toLowerCase().replace(/\./g,'')];
     const rawDay = lastMatch.dayStr.toLowerCase().trim();
+
+    // FIX 1b: try spokenToNum on raw string first (handles "twenty eighth" → 28)
     let day = spokenToNum(rawDay);
     if(isNaN(day)) day = spokenToNum(rawDay.replace(/(st|nd|rd|th)$/, '').trim());
-    if(isNaN(day)) day = parseInt(rawDay, 10);
+    if(isNaN(day)) day = parseInt(rawDay);
+
     if(mIdx !== undefined && !isNaN(day) && day >= 1 && day <= 31){
       let d = new Date(today.getFullYear(), mIdx, day);
       if(d < today) d.setFullYear(today.getFullYear() + 1);
@@ -743,35 +726,46 @@ function parseDateFromText(text){
   if(lower.includes('tomorrow'))  { const d = new Date(today); d.setDate(today.getDate()+1); return d; }
   if(lower.includes('next week')) { const d = new Date(today); d.setDate(today.getDate()+7); return d; }
   if(lower.includes('today'))     { return new Date(today); }
+
   return null;
 }
 
 /* ════════════════════════════════════════════════════════
    TIME PARSER
+   Handles "ten thirty AM", "three thirty PM", "9 am", "10:30 am", etc.
 ════════════════════════════════════════════════════════ */
 function parseSpokenTime(text){
   if(!text) return null;
   const lower = text.toLowerCase();
+
+  // Numeric "10:30 am"
   const numMatch = lower.match(/\b(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b/);
   if(numMatch) return numMatch[1] + ':' + (numMatch[2]||'00') + ' ' + numMatch[3].toUpperCase();
 
-  const hourWords = {one:1,two:2,three:3,four:4,five:5,six:6,seven:7,eight:8,nine:9,ten:10,eleven:11,twelve:12};
+  const hourWords = { one:1, two:2, three:3, four:4, five:5, six:6, seven:7, eight:8, nine:9, ten:10, eleven:11, twelve:12 };
   const minWords  = {
-    'oh':0,'zero':0,'five':5,'ten':10,'fifteen':15,'twenty':20,
-    'twenty five':25,'twenty-five':25,'thirty':30,
-    'thirty five':35,'thirty-five':35,'forty':40,
-    'forty five':45,'forty-five':45,'fifty':50,'fifty five':55,'fifty-five':55
+    oh:0, zero:0, five:5, ten:10, fifteen:15, twenty:20,
+    'twenty five':25, 'twenty-five':25, thirty:30,
+    'thirty five':35, 'thirty-five':35, forty:40,
+    'forty five':45, 'forty-five':45, fifty:50,
+    'fifty five':55, 'fifty-five':55
   };
 
+  // "HOUR MINUTE am/pm"
   const spoken = lower.match(
     /\b(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\s+(fifty[- ]five|forty[- ]five|thirty[- ]five|twenty[- ]five|fifty|forty|thirty|twenty|fifteen|ten|oh|zero|five)\s*(am|pm)\b/
   );
   if(spoken){
-    const h = hourWords[spoken[1]], key = spoken[2].replace('-',' ');
-    return `${h}:${String(minWords[key]||0).padStart(2,'0')} ${spoken[3].toUpperCase()}`;
+    const h   = hourWords[spoken[1]];
+    const key = spoken[2].replace('-',' ');
+    const min = minWords[key] !== undefined ? minWords[key] : 0;
+    return `${h}:${String(min).padStart(2,'0')} ${spoken[3].toUpperCase()}`;
   }
+
+  // "HOUR am/pm"
   const simple = lower.match(/\b(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\s*(am|pm)\b/);
   if(simple) return `${hourWords[simple[1]]}:00 ${simple[2].toUpperCase()}`;
+
   return null;
 }
 
@@ -794,7 +788,7 @@ function parseScheduleFromUserInput(text){
 const MONTHS_SHORT = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 
 function renderCalendar(){
-  const today       = new Date();
+  const today = new Date();
   const firstDay    = new Date(calYear, calMonth, 1).getDay();
   const daysInMonth = new Date(calYear, calMonth+1, 0).getDate();
   calLabel.textContent = `${MONTHS_SHORT[calMonth]}. ${calYear}`;
@@ -803,8 +797,7 @@ function renderCalendar(){
     const e = document.createElement('div'); e.className='cal-day empty'; calGrid.appendChild(e);
   }
   for(let d=1; d<=daysInMonth; d++){
-    const cell = document.createElement('div');
-    cell.className   = 'cal-day';
+    const cell = document.createElement('div'); cell.className = 'cal-day';
     cell.textContent = d;
     if(d===today.getDate() && calMonth===today.getMonth() && calYear===today.getFullYear()) cell.classList.add('today');
     if(scheduledEvent){
@@ -818,22 +811,18 @@ function renderCalendar(){
   }
 }
 
-// FIX: JS listeners instead of inline onclick for CSP safety
-document.getElementById('calPrevBtn').addEventListener('click', () => changeMonth(-1));
-document.getElementById('calNextBtn').addEventListener('click', () => changeMonth(1));
-
-function changeMonth(dir){
+window.changeMonth = function(dir){
   calMonth += dir;
   if(calMonth > 11){ calMonth=0; calYear++; }
   if(calMonth < 0) { calMonth=11; calYear--; }
   renderCalendar();
-}
+};
 
 /* ════════════════════════════════════════════════════════
-   EVENTS RENDER — FIX: DOM-safe, XSS-safe (textContent)
+   EVENTS RENDER
 ════════════════════════════════════════════════════════ */
 function renderEvents(){
-  Array.from(eventsScroll.children).forEach(c => { if(c !== evEmpty) eventsScroll.removeChild(c); });
+  Array.from(eventsScroll.children).forEach(c => { if(c!==evEmpty) c.remove(); });
   if(!scheduledEvent){ evEmpty.style.display='flex'; return; }
   evEmpty.style.display = 'none';
 
@@ -842,62 +831,64 @@ function renderEvents(){
   const isFuture   = evMidnight >= todayMidnight();
   const dateLabel  = ev.date.toLocaleDateString('en-US',{month:'short',day:'numeric'});
 
-  // Main event row (XSS-safe: textContent used for user data)
   const row = document.createElement('div');
   row.className = 'ev-row' + (isFuture ? ' future' : '');
-  row.addEventListener('click', openGoogleCalendar);
-
-  const dl = document.createElement('div'); dl.className='ev-date-label'; dl.textContent=dateLabel;
-  const dot = document.createElement('div'); dot.className='ev-dot'; dot.style.background='#2D5A27';
-  dot.innerHTML=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>`;
-  const body = document.createElement('div'); body.className='ev-body';
-  const titleEl = document.createElement('div'); titleEl.className='ev-title'; titleEl.textContent=ev.title;
-  const timeEl  = document.createElement('div'); timeEl.className='ev-time';  timeEl.textContent=ev.time||'All day';
-  body.appendChild(titleEl); body.appendChild(timeEl);
-  const badge = document.createElement('div');
-  badge.className='ev-badge '+(isFuture?'badge-future':'badge-done');
-  badge.textContent=isFuture?'Upcoming':'Done';
-  row.appendChild(dl); row.appendChild(dot); row.appendChild(body); row.appendChild(badge);
+  row.onclick   = openGoogleCalendar;
+  row.innerHTML = `
+    <div class="ev-date-label">${dateLabel}</div>
+    <div class="ev-dot" style="background:#2D5A27">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="4" width="18" height="18" rx="2"/>
+        <line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+      </svg>
+    </div>
+    <div class="ev-body">
+      <div class="ev-title">${ev.title}</div>
+      <div class="ev-time">${ev.time||'All day'}</div>
+    </div>
+    <div class="ev-badge ${isFuture?'badge-future':'badge-done'}">${isFuture?'Upcoming':'Done'}</div>`;
   eventsScroll.appendChild(row);
 
   const divider = document.createElement('div'); divider.className='ev-divider';
   eventsScroll.appendChild(divider);
 
-  // "Open in Google Calendar" row
-  const open = document.createElement('div'); open.className='ev-row';
-  open.addEventListener('click', openGoogleCalendar);
-  const dl2 = document.createElement('div'); dl2.className='ev-date-label';
-  const dot2 = document.createElement('div'); dot2.className='ev-dot'; dot2.style.background='#3A86FF';
-  dot2.innerHTML=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>`;
-  const body2=document.createElement('div'); body2.className='ev-body';
-  const ot=document.createElement('div'); ot.className='ev-title'; ot.style.color='#3A86FF'; ot.textContent='Open in Google Calendar';
-  const os=document.createElement('div'); os.className='ev-time'; os.textContent='Tap to view & edit';
-  body2.appendChild(ot); body2.appendChild(os);
-  open.appendChild(dl2); open.appendChild(dot2); open.appendChild(body2);
+  const open = document.createElement('div');
+  open.className = 'ev-row'; open.onclick = openGoogleCalendar;
+  open.innerHTML = `
+    <div class="ev-date-label"></div>
+    <div class="ev-dot" style="background:#3A86FF">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/>
+        <polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
+      </svg>
+    </div>
+    <div class="ev-body">
+      <div class="ev-title" style="color:#3A86FF">Open in Google Calendar</div>
+      <div class="ev-time">Tap to view &amp; edit</div>
+    </div>`;
   eventsScroll.appendChild(open);
 }
 
 /* ════════════════════════════════════════════════════════
    GOOGLE CALENDAR LINK
 ════════════════════════════════════════════════════════ */
-function openGoogleCalendar(){
+window.openGoogleCalendar = function(){
   if(!scheduledEvent) return;
-  // FIX: noopener for security
-  if(scheduledEvent.gcalLink){ window.open(scheduledEvent.gcalLink, '_blank', 'noopener'); return; }
-  const ev=scheduledEvent, d=ev.date;
-  const pad=n=>String(n).padStart(2,'0');
-  const dateStr=`${d.getFullYear()}/${pad(d.getMonth()+1)}/${pad(d.getDate())}`;
-  const url=`https://calendar.google.com/calendar/r/day/${dateStr}?authuser=${encodeURIComponent(CALENDAR_EMAIL)}`;
-  window.open(url, '_blank', 'noopener');
-}
+  if(scheduledEvent.gcalLink){ window.open(scheduledEvent.gcalLink, '_blank'); return; }
+  const ev  = scheduledEvent, d = ev.date;
+  const pad = n => String(n).padStart(2,'0');
+  const dateStr = `${d.getFullYear()}/${pad(d.getMonth()+1)}/${pad(d.getDate())}`;
+  const url = `https://calendar.google.com/calendar/r/day/${dateStr}?authuser=${encodeURIComponent(CALENDAR_EMAIL)}`;
+  console.log('[SAMAY] Opening Google Calendar:', url);
+  window.open(url, '_blank');
+};
 
 /* ════════════════════════════════════════════════════════
    TEXT-MODE FALLBACK HANDLER
 ════════════════════════════════════════════════════════ */
 function handleTextInput(text){
-  if(!text || !text.trim()) return;
   addMsg("user", text);
-  if(/schedule|book|set.?up|meeting|appointment|call|remind/i.test(text)){
+  if(text.toLowerCase().match(/schedule|book|set.?up|meeting|appointment|call|remind/)){
     showTyping(true);
     setTimeout(async () => {
       const ev = parseScheduleFromUserInput(text);
@@ -929,152 +920,225 @@ function loadVapi(){
   import("./vapi-bundle.js").then(mod => {
     VapiClass = mod.default ?? mod.Vapi ?? mod.VapiSDK;
     if(typeof VapiClass !== "function" && VapiClass?.default) VapiClass = VapiClass.default;
-    if(typeof VapiClass !== "function"){ console.warn('[SAMAY] No valid Vapi class found'); VapiClass=null; return; }
-    console.log('[SAMAY] Vapi loaded OK');
-  }).catch(err => {
-    console.warn('[SAMAY] vapi-bundle.js not found — text mode only:', err.message);
-    VapiClass = null;
+    console.log('[SAMAY] Vapi loaded:', typeof VapiClass);
+  }).catch(() => {
+    console.warn('[SAMAY] vapi-bundle.js not found — text mode only');
   });
 }
 
 /* ════════════════════════════════════════════════════════
-   VAPI — WIRE LISTENERS (exactly once)
+   VAPI — WIRE EVENT LISTENERS
+   FIX 4: Called exactly once (guarded by vapiWired flag).
+   This prevents KrispSDK from being imported multiple times on
+   call restarts, which caused the duplication warning.
 ════════════════════════════════════════════════════════ */
 function wireVapi(){
   if(vapiWired) return;
   vapiWired = true;
 
   vapi.on("call-start", () => {
-    assistantBuffer=''; allUserSpeech=''; userUtterances=[]; pendingEvent=null;
+    console.log('[VAPI EVENT] call-start');
+    // Reset all per-call state here
+    assistantBuffer = '';
+    allUserSpeech   = '';
+    userUtterances  = [];
+    pendingEvent    = null;
     goActive();
   });
 
-  vapi.on("call-end", () => { showToast("Call ended"); goIdle(); });
+  vapi.on("call-end", () => {
+    console.log('[VAPI EVENT] call-end');
+    showToast("Call ended");
+    goIdle();
+  });
 
-  vapi.on("speech-start", () => showTyping(true));
-  vapi.on("speech-end",   () => showTyping(false));
+  vapi.on("speech-start", () => {
+    console.log('[VAPI EVENT] speech-start');
+    showTyping(true);
+  });
+
+  vapi.on("speech-end", () => {
+    console.log('[VAPI EVENT] speech-end');
+    showTyping(false);
+  });
 
   vapi.on("message", msg => {
-    if(!msg || !msg.type) return; // FIX: guard null message
+    console.log('[VAPI MESSAGE] type:', msg.type);
 
-    /* ── TOOL CALL ── */
+    /* ── 1. TOOL CALL ───────────────────────────────────────────── */
     if(msg.type === 'tool-calls' || msg.type === 'function-call'){
+      console.log('[VAPI TOOL RAW]', JSON.stringify(msg, null, 2));
       const toolList = msg.toolCallList || msg.toolCalls ||
                        (msg.functionCall ? [{ function: msg.functionCall }] : []);
+
       toolList.forEach(tool => {
-        if(!tool) return;
         const fn     = tool.function || tool;
         const fnName = (fn?.name || '').toLowerCase();
-        let fnArgs   = fn?.arguments || tool?.arguments || '{}';
-        if(!/schedule|meeting|calendar|event|book/.test(fnName)) return;
-        if(typeof fnArgs === 'string'){ try{ fnArgs=JSON.parse(fnArgs); }catch(e){ fnArgs={}; } }
+        const fnArgs = fn?.arguments || tool?.arguments || '{}';
+        console.log('[VAPI TOOL] called:', fnName, '| raw args:', fnArgs);
 
+        const isScheduler = fnName.includes('schedule') || fnName.includes('meeting') ||
+                            fnName.includes('calendar') || fnName.includes('event')   ||
+                            fnName.includes('book');
+        if(!isScheduler) return;
+
+        let args = fnArgs;
+        if(typeof args === 'string'){ try{ args = JSON.parse(args); }catch(e){ args={}; } }
+
+        // Parse date from tool arguments (ISO strings preferred)
         let eventDate = null;
-        if(fnArgs.date){
-          const raw = String(fnArgs.date).trim();
-          if(/^\d{4}-\d{2}-\d{2}T/.test(raw)) eventDate = new Date(raw);
-          else if(/^\d{4}-\d{2}-\d{2}$/.test(raw)){
-            const [y,mo,dy]=raw.split('-').map(Number); eventDate=new Date(y,mo-1,dy);
-          } else eventDate=new Date(raw);
-          if(isNaN(eventDate?.getTime())) eventDate=null;
+        if(args.date){
+          const raw = args.date.trim();
+          if(/^\d{4}-\d{2}-\d{2}T/.test(raw)){
+            eventDate = new Date(raw);
+          } else if(/^\d{4}-\d{2}-\d{2}$/.test(raw)){
+            const [y,mo,dy] = raw.split('-').map(Number);
+            eventDate = new Date(y, mo-1, dy);
+          } else {
+            eventDate = new Date(raw);
+          }
+          if(isNaN(eventDate?.getTime())) eventDate = null;
         }
-        if(!eventDate) eventDate=new Date(Date.now()+86400000);
+        if(!eventDate) eventDate = new Date(Date.now() + 86400000);
 
         pendingEvent = {
-          title:    fnArgs.title||fnArgs.summary||fnArgs.eventName||fnArgs.meeting_title||'Meeting',
+          title:    args.title || args.summary || args.eventName || args.meeting_title || 'Meeting',
           date:     eventDate,
-          time:     fnArgs.time||fnArgs.startTime||fnArgs.meeting_time||null,
-          gcalLink: fnArgs.link||fnArgs.htmlLink||null
+          time:     args.time  || args.startTime || args.meeting_time || null,
+          gcalLink: args.link  || args.htmlLink  || null
         };
-        console.log('[VAPI TOOL] pendingEvent:', JSON.stringify(pendingEvent));
+        console.log('[VAPI TOOL] ⭐ pendingEvent stored:', JSON.stringify(pendingEvent));
       });
       return;
     }
 
-    /* ── TOOL CALL RESULT ── */
+    /* ── 2. TOOL CALL RESULT ────────────────────────────────────── */
     if(msg.type === 'tool-call-result' || msg.type === 'function-call-result'){
+      console.log('[VAPI TOOL RESULT]', JSON.stringify(msg));
       try{
-        const result = typeof msg.result==='string' ? JSON.parse(msg.result) : (msg.result||{});
-        if(result && (result.date||result.eventDate||result.htmlLink)){
-          const rawDate = result.date||result.eventDate;
-          let evDate = rawDate
-            ? (/^\d{4}-\d{2}-\d{2}$/.test(String(rawDate).trim())
-                ? (([y,mo,dy])=>new Date(y,mo-1,dy))(String(rawDate).trim().split('-').map(Number))
-                : new Date(rawDate))
-            : null;
-          if(!evDate||isNaN(evDate.getTime())) evDate=new Date(Date.now()+86400000);
-          const ev={
-            title:    result.title||result.summary||result.eventName||'Meeting',
-            date:     evDate, time:result.time||result.startTime||null,
-            gcalLink: result.htmlLink||result.link||null
+        const result = typeof msg.result === 'string' ? JSON.parse(msg.result) : msg.result;
+        if(result && (result.date || result.eventDate || result.htmlLink)){
+          const rawDate = result.date || result.eventDate;
+          let evDate = null;
+          if(rawDate){
+            evDate = /^\d{4}-\d{2}-\d{2}$/.test(rawDate.trim())
+              ? (([y,mo,dy]) => new Date(y, mo-1, dy))(rawDate.trim().split('-').map(Number))
+              : new Date(rawDate);
+          }
+          if(!evDate || isNaN(evDate.getTime())) evDate = new Date(Date.now() + 86400000);
+
+          const ev = {
+            title:    result.title || result.summary || result.eventName || 'Meeting',
+            date:     evDate,
+            time:     result.time || result.startTime || null,
+            gcalLink: result.htmlLink || result.link  || null
           };
-          showToast('✅ Meeting scheduled!',2500);
-          setTimeout(()=>goCalendar(ev,'tool-result'),800);
+          console.log('[VAPI TOOL RESULT] → goCalendar:', ev);
+          showToast('✅ Meeting scheduled!', 2500);
+          setTimeout(() => goCalendar(ev, 'tool-result'), 800);
         }
-      }catch(e){ console.warn('[VAPI TOOL RESULT] parse error:',e); }
+      } catch(e){ console.log('[VAPI TOOL RESULT] parse error:', e); }
       return;
     }
 
-    /* ── TRANSCRIPT ── */
-    if(msg.type==="transcript" && msg.transcriptType==="final"){
-      if(!msg.transcript||!msg.transcript.trim()) return; // FIX: skip blank
+    /* ── 3. TRANSCRIPT ──────────────────────────────────────────── */
+    if(msg.type === "transcript" && msg.transcriptType === "final"){
       showTyping(false);
-      addMsg(msg.role==="user"?"user":"ai", msg.transcript);
+      addMsg(msg.role === "user" ? "user" : "ai", msg.transcript);
 
-      if(msg.role==="user"){
+      if(msg.role === "user"){
         allUserSpeech += ' ' + msg.transcript;
         userUtterances.push(msg.transcript);
+        console.log('[VAPI] User said:', msg.transcript);
       }
-      if(msg.role==="assistant"){
-        assistantBuffer += ' ' + msg.transcript;
-        if(/meeting[\s_-]?confirmed/i.test(msg.transcript)){
-          let ev;
-          if(pendingEvent){
-            ev = { ...pendingEvent };
-          } else {
-            let eventDate = parseDateFromText(allUserSpeech) || parseDateFromText(assistantBuffer);
-            if(!eventDate) eventDate = new Date(Date.now()+86400000);
-            let time = parseSpokenTime(allUserSpeech) || parseSpokenTime(assistantBuffer);
 
+      if(msg.role === "assistant"){
+        const text = msg.transcript;
+        console.log('[VAPI] Assistant said:', text);
+        assistantBuffer += ' ' + text;
+
+        if(/meeting[\s_-]?confirmed/i.test(text)){
+          console.log('[VAPI] ✅ MEETING_CONFIRMED detected in:', text);
+          console.log('[VAPI] pendingEvent:', JSON.stringify(pendingEvent));
+          console.log('[VAPI] allUserSpeech:', allUserSpeech);
+
+          let ev;
+
+          if(pendingEvent){
+            // ── Happy path: tool call gave us clean structured data ──
+            ev = { ...pendingEvent };
+
+          } else {
+            // ── Fallback: reconstruct from accumulated speech ────────
+
+            // FIX 1b in action: parseDateFromText now tries spokenToNum before
+            // stripping ordinal suffixes, so "February twenty eighth" → Feb 28.
+            let eventDate = parseDateFromText(allUserSpeech);
+            if(!eventDate){
+              eventDate = parseDateFromText(assistantBuffer);
+              console.log('[VAPI] Date from assistantBuffer:', eventDate, '| buffer:', assistantBuffer);
+            }
+            if(!eventDate) eventDate = new Date(Date.now() + 86400000);
+
+            let time = parseSpokenTime(allUserSpeech);
+            if(!time) time = parseSpokenTime(assistantBuffer);
+
+            // FIX 2: Strip trailing punctuation [.!?,] before applying filters
+            // so "Yes." is correctly caught as a filler word.
             const isDateWord = /(january|february|march|april|may|june|july|august|september|october|november|december|monday|tuesday|wednesday|thursday|friday|saturday|sunday|tomorrow|today|next|twenty|thirty|first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth|\d)/i;
             const isTimeWord = /(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|\d)\s*(am|pm|ist)/i;
+            // FIX 2b: filler regex now allows trailing punctuation via [.!?,]*
             const isFiller   = /^(yes|no|okay|ok|sure|thanks|thank|hello|hi|namaste|please|proceed|blank|leave|skip|none|no title|am|pm)[.!?,]*$/i;
 
             let title = 'Meeting';
             for(const utt of [...userUtterances].reverse()){
-              const u = utt.trim().replace(/[.!?,]+$/,'');
-              if(u.length < 2 || isFiller.test(u) || isTimeWord.test(u) || isDateWord.test(u)) continue;
+              // FIX 2a: strip trailing punctuation BEFORE testing
+              const u = utt.trim().replace(/[.!?,]+$/, '');
+              if(u.length < 2)       continue;
+              if(isFiller.test(u))   continue;
+              if(isTimeWord.test(u)) continue;
+              if(isDateWord.test(u)) continue;
               title = u.charAt(0).toUpperCase() + u.slice(1);
               break;
             }
+
             ev = { title, date: eventDate, time, gcalLink: null };
           }
-          showToast('✅ Meeting scheduled!',2000);
-          setTimeout(()=>goCalendar(ev, pendingEvent?'tool-call':'speech-parse'),500);
-          pendingEvent=null; assistantBuffer='';
+
+          console.log('[VAPI] → goCalendar:', ev);
+          showToast('✅ Meeting scheduled!', 2000);
+          setTimeout(() => goCalendar(ev, pendingEvent ? 'tool-call' : 'speech-parse'), 500);
+
+          pendingEvent    = null;
+          assistantBuffer = '';
         }
       }
     }
   });
 
   vapi.on("error", err => {
-    console.warn('[VAPI] error:', err);
-    showToast("⚠ " + (err?.message || err?.error?.message || "Connection error"), 5000);
+    console.log('[VAPI EVENT] error:', JSON.stringify(err));
+    showToast("⚠ " + (err?.message || "Error"), 5000);
     goIdle();
   });
 }
 
 /* ════════════════════════════════════════════════════════
-   VAPI — START CALL (instance created once)
+   VAPI — START CALL
+   FIX 4: Create the VapiClass instance ONCE and reuse it.
+   Subsequent calls just call vapi.start() on the existing instance.
+   This eliminates the KrispSDK duplicate import warning.
 ════════════════════════════════════════════════════════ */
 async function startCall(){
-  if(!VapiClass){ showToast("⚠ Voice not ready — use text mode or reload"); return; }
+  if(!VapiClass){ showToast("⚠ vapi-bundle.js not loaded yet — use text mode"); return; }
   goConnecting();
   try{
-    if(!vapi){ vapi = new VapiClass(PUBLIC_KEY); wireVapi(); }
+    if(!vapi){
+      vapi = new VapiClass(PUBLIC_KEY); // created exactly once
+      wireVapi();                        // listeners attached exactly once
+    }
     await vapi.start(ASSISTANT_ID);
   } catch(e){
-    console.error('[SAMAY] startCall error:', e);
     showToast("⚠ " + (e.message || "Could not connect"));
     goIdle();
   }
@@ -1086,27 +1150,13 @@ async function startCall(){
 callBtn.addEventListener("click", startCall);
 
 cancelBtn.addEventListener("click", () => {
-  try{ if(vapi) vapi.stop(); } catch(e){ console.warn('[SAMAY] stop error:', e); }
+  if(vapi) vapi.stop();
   goIdle();
-});
-
-hangupBtn.addEventListener("click", () => {
-  try{ if(vapi) vapi.stop(); } catch(e){ console.warn('[SAMAY] stop error:', e); }
-  goIdle();
-});
-
-// FIX: back button — return to appropriate state
-backBtn.addEventListener("click", () => {
-  scheduledEvent = null;
-  // If vapi call is active, go back to active; else go idle
-  if(vapi && appState === 'calendar') setState('active');
-  else goIdle();
 });
 
 idleInput.addEventListener("keydown", e => {
-  if(e.key === "Enter"){
+  if(e.key === "Enter" && idleInput.value.trim()){
     const v = idleInput.value.trim();
-    if(!v) return;
     idleInput.value = "";
     setState('active');
     handleTextInput(v);
@@ -1114,36 +1164,21 @@ idleInput.addEventListener("keydown", e => {
 });
 
 activeInput.addEventListener("keydown", e => {
-  if(e.key === "Enter"){
+  if(e.key === "Enter" && activeInput.value.trim()){
     const v = activeInput.value.trim();
-    if(!v) return;
     activeInput.value = "";
     if(vapi?.send){
       addMsg("user", v);
-      try{ vapi.send({ type:"add-message", message:{ role:"user", content:v } }); }
-      catch(err){ console.warn('[SAMAY] vapi.send error:', err); }
+      vapi.send({ type:"add-message", message:{ role:"user", content:v } });
     } else {
       handleTextInput(v);
     }
   }
 });
 
-// FIX: Escape key exits calendar (or cancels connecting)
-document.addEventListener('keydown', e => {
-  if(e.key === 'Escape'){
-    if(appState === 'calendar'){
-      scheduledEvent = null;
-      if(vapi) setState('active'); else goIdle();
-    } else if(appState === 'connecting'){
-      try{ if(vapi) vapi.stop(); } catch(ex){}
-      goIdle();
-    }
-  }
-});
-
-// FIX: prevent double-tap zoom on touch devices for action buttons
-[callBtn, hangupBtn, cancelBtn, backBtn].forEach(btn => {
-  btn.addEventListener('touchend', e => e.preventDefault(), { passive: false });
+hangupBtn.addEventListener("click", () => {
+  if(vapi) vapi.stop();
+  goIdle();
 });
 
 /* ════════════════════════════════════════════════════════
